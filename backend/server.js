@@ -79,6 +79,11 @@ app.post('/message', async (req, res) => {
         }
       }
     }
+    if (phoneAuto) {
+      console.log('Captured phone from header:', phoneAuto);
+    } else {
+      console.log('No MSISDN headers found; headers present:', Object.keys(req.headers));
+    }
     
     const newMessage = {
       id: Date.now(),
