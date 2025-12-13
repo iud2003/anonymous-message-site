@@ -7,6 +7,10 @@ const axios = require('axios');
 const app = express();
 const PORT = 3000;
 
+// Trust proxy so req.ip reflects x-forwarded-for on Render/Cloudflare/etc.
+app.set('trust proxy', true);
+
+// CORS: allow all for now; optionally restrict to your frontend origin
 app.use(cors());
 app.use(express.json());
 
