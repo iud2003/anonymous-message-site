@@ -72,11 +72,20 @@ app.post('/message', async (req, res) => {
     
     // Get location from IP (using free ip-api.com service)
     let location = 'Unknown';
+    let coordinates = null;
     try {
       if (ip && ip !== '::1' && ip !== '127.0.0.1' && ip !== 'Unknown') {
         const response = await axios.get(`http://ip-api.com/json/${ip}`);
         if (response.data && response.data.status === 'success') {
           location = `${response.data.city}, ${response.data.country}`;
+          // Extract precise coordinates from IP geolocation
+          if (response.data.lat && response.data.lon) {
+            coordinates = {
+              latitude: response.data.lat,
+              longitude: response.data.lon,
+              accuracy: 5000 // ~5km accuracy for IP-based geolocation
+            };
+          }
         }
       } else {
         location = 'Local/Localhost';
@@ -130,7 +139,7 @@ app.post('/message', async (req, res) => {
       timestamp: new Date().toISOString(),
       ip,
       location: location,
-      coordinates: coordinates || null,
+      coordinates: coordinates,
       userAgent: {
         browser: uaParsed.browser.name || 'Unknown',
         browserVersion: uaParsed.browser.version || 'Unknown',

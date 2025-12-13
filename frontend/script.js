@@ -8,27 +8,6 @@ const submitBtn = document.getElementById('submitBtn');
 const messagesContainer = document.getElementById('messagesContainer');
 const charCount = document.getElementById('charCount');
 
-// Get precise coordinates using Geolocation API
-async function getCoordinates() {
-    return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            resolve(null);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                });
-            },
-            () => resolve(null),
-            { timeout: 5000, enableHighAccuracy: true }
-        );
-    });
-}
-
 // Update character count
 messageInput.addEventListener('input', () => {
     const count = messageInput.value.length;
@@ -48,18 +27,10 @@ submitBtn.addEventListener('click', async () => {
     }
     
     try {
-        // Fetch precise coordinates
-        const coordinates = await getCoordinates();
-        
-        const payload = { message: content };
-        if (coordinates) {
-            payload.coordinates = coordinates;
-        }
-        
         const response = await fetch(`${API_URL}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ message: content })
         });
         
         if (response.ok) {
