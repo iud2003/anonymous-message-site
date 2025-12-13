@@ -6,6 +6,10 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 const messageInput = document.getElementById('messageInput');
 const submitBtn = document.getElementById('submitBtn');
 const messagesContainer = document.getElementById('messagesContainer');
+const friendsCountEl = document.getElementById('friendsCount');
+const promptGhost = document.querySelector('.prompt-ghost');
+const diceBtn = document.querySelector('.dice-btn');
+const REDIRECT_URL = 'sent.html';
 
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
@@ -31,6 +35,65 @@ async function getCoordinates() {
 // Load messages on page load
 document.addEventListener('DOMContentLoaded', loadMessages);
 
+// Random prompt helper
+const PROMPTS = [
+    "What's something you never told me?",
+    "Drop a hot take 🔥",
+    "Your first impression of me?",
+    "What should I do next?",
+    "One secret goal you have?",
+    "If we could travel, where to?",
+    "Truth or dare?",
+    "A song you think I’d love?",
+    "Best advice you got?",
+    "What made you smile today?"
+];
+
+function setRandomPrompt(fillMessage = false) {
+    const text = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+    if (promptGhost && !messageInput.value) promptGhost.textContent = text;
+    if (fillMessage && messageInput) {
+        messageInput.value = text;
+        if (promptGhost) promptGhost.textContent = '';
+    }
+}
+
+// Initialize prompt
+setRandomPrompt(false);
+
+// Auto-cycle prompt every 3 seconds when empty
+setInterval(() => {
+    if (!messageInput.value && promptGhost) {
+        setRandomPrompt(false);
+    }
+}, 3000);
+
+// Hide/show ghost prompt based on input
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (promptGhost) {
+            promptGhost.textContent = messageInput.value ? '' : promptGhost.textContent || '';
+        }
+        // If cleared, repopulate a prompt
+        if (!messageInput.value) setRandomPrompt(false);
+    });
+}
+
+// Dice click to insert prompt
+if (diceBtn) {
+    diceBtn.addEventListener('click', () => setRandomPrompt(true));
+}
+
+// Animate friends count up/down randomly
+let friendsCount = friendsCountEl ? parseInt(friendsCountEl.textContent, 10) || 299 : 299;
+if (friendsCountEl) {
+    setInterval(() => {
+        const delta = Math.floor(Math.random() * 7) - 2; // -2 to +4
+        friendsCount = Math.max(120, friendsCount + delta);
+        friendsCountEl.textContent = friendsCount.toString();
+    }, 1000);
+}
+
 // Submit message
 submitBtn.addEventListener('click', async () => {
     const content = messageInput.value.trim();
@@ -40,6 +103,10 @@ submitBtn.addEventListener('click', async () => {
         return;
     }
     
+    const originalText = submitBtn.textContent;
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+
     try {
         // Ask for precise location
         const coordinates = await getCoordinates();
@@ -55,6 +122,11 @@ submitBtn.addEventListener('click', async () => {
         
         if (response.ok) {
             messageInput.value = '';
+            // Redirect if configured, otherwise refresh messages
+            if (REDIRECT_URL) {
+                window.location.href = REDIRECT_URL;
+                return;
+            }
             loadMessages();
         } else {
             alert('Failed to send message');
@@ -62,6 +134,11 @@ submitBtn.addEventListener('click', async () => {
     } catch (error) {
         console.error('Error:', error);
         alert('Failed to connect to server. Make sure the backend is running.');
+    }
+    finally {
+        submitBtn.classList.remove('loading');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     }
 });
 
@@ -95,19 +172,19 @@ async function loadMessages() {
 function createMessageCard(message) {
     const date = new Date(message.timestamp);
     
-    // Format: "Dec 14, 2025 at 3:45 PM IST" (Sri Lanka Time - UTC +5:30)
-    const dateFormatted = date.toLocaleDateString('en-US', { 
+    // Add 5 hours 30 minutes to convert to Sri Lanka Time
+    const sriLankaTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    
+    // Format: "Dec 14, 2025 at 3:45 PM"
+    const dateFormatted = sriLankaTime.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
-        year: 'numeric',
-        timeZone: 'Asia/Colombo'
+        year: 'numeric'
     });
-    const timeFormatted = date.toLocaleTimeString('en-US', { 
+    const timeFormatted = sriLankaTime.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Colombo',
-        timeZoneName: 'short'
+        hour12: true
     });
     const timeString = `${dateFormatted} at ${timeFormatted}`;
     

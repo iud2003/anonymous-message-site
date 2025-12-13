@@ -14,12 +14,13 @@
                     <img class="avatar" src="avatar.jpeg" alt="avatar">
                     <div class="user-meta">
                         <div class="username">@isum_1110</div>
-                        <div class="tagline">send me anonymous messages!</div>
+                        <div class="tagline"></div>
                     </div>
                 </div>
 
                 <div class="card-body">
-                    <textarea id="messageInput" placeholder="Write your anonymous message here..." maxlength="500"></textarea>
+                    <textarea id="messageInput" placeholder="" maxlength="500"></textarea>
+                    <div class="prompt-ghost" aria-hidden="true"></div>
                     <button class="dice-btn" type="button" aria-label="Random prompt">🎲</button>
                 </div>
             </div>
@@ -32,7 +33,7 @@
         </section>
 
         <section class="cta">
-            <div class="cta-blurb">👇 299 friends just tapped the button 👇</div>
+            <div class="cta-blurb">👇 <span id="friendsCount">299</span> friends just tapped the button 👇</div>
             <button class="secondary-btn" type="button">Get your own messages!</button>
         </section>
 

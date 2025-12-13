@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sent!</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="sent-body">
+  <div class="sent-page">
+    <button class="back-btn" onclick="history.back()" aria-label="Go back">←</button>
+
+    <div class="sent-icon">✔</div>
+    <div class="sent-title">Sent!</div>
+    <div class="cta-blurb">👇 <span id="friendsCount">259</span> friends just tapped the button 👇</div>
+
+    <button class="secondary-btn" type="button" onclick="location.href='index.html'">Get your own messages!</button>
+    <a class="sent-link" href="index.html">Send another message</a>
+  </div>
+
+  <script>
+    // Simple count wiggle
+    const el = document.getElementById('friendsCount');
+    let c = parseInt(el.textContent, 10) || 259;
+    setInterval(() => {
+      const delta = Math.floor(Math.random() * 7) - 2; // -2 to +4
+      c = Math.max(120, c + delta);
+      el.textContent = c;
+    }, 1000);
+  </script>
+</body>
+</html>
