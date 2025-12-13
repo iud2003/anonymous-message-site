@@ -7,26 +7,45 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📬 Anonymous Message Board</h1>
-            <p class="subtitle">Share your thoughts anonymously</p>
-        </header>
+    <div class="page">
+        <section class="hero">
+            <div class="card">
+                <div class="card-header">
+                    <img class="avatar" src="https://i.pravatar.cc/80?img=5" alt="avatar">
+                    <div class="user-meta">
+                        <div class="username">@isum_1110</div>
+                        <div class="tagline">send me anonymous messages!</div>
+                    </div>
+                </div>
 
-        <div class="message-form">
-            <textarea id="messageInput" placeholder="Write your anonymous message here..." maxlength="500"></textarea>
-            <div class="form-footer">
-                <span id="charCount">0/500</span>
-                <button id="submitBtn">Send Message</button>
+                <div class="card-body">
+                    <textarea id="messageInput" placeholder="Write your anonymous message here..." maxlength="500"></textarea>
+                    <button class="dice-btn" type="button" aria-label="Random prompt">🎲</button>
+                </div>
             </div>
-        </div>
 
-        <div class="messages-section">
-            <h2>Messages</h2>
+            <div class="subtext">🔒 anonymous q&a</div>
+
+            <div class="actions">
+                <button id="submitBtn" class="primary-btn">Send!</button>
+            </div>
+        </section>
+
+        <section class="cta">
+            <div class="cta-blurb">👇 299 friends just tapped the button 👇</div>
+            <button class="secondary-btn" type="button">Get your own messages!</button>
+        </section>
+
+        <footer class="footer-links">
+            <a href="#">Terms</a>
+            <a href="#">Privacy</a>
+        </footer>
+
+        <section class="messages-section" aria-hidden="true">
             <div id="messagesContainer">
                 <p class="no-messages">No messages yet. Be the first to share!</p>
             </div>
-        </div>
+        </section>
     </div>
 
     <script src="script.js"></script>

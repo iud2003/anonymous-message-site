@@ -6,7 +6,6 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 const messageInput = document.getElementById('messageInput');
 const submitBtn = document.getElementById('submitBtn');
 const messagesContainer = document.getElementById('messagesContainer');
-const charCount = document.getElementById('charCount');
 
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
@@ -28,12 +27,6 @@ async function getCoordinates() {
         );
     });
 }
-
-// Update character count
-messageInput.addEventListener('input', () => {
-    const count = messageInput.value.length;
-    charCount.textContent = `${count}/500`;
-});
 
 // Load messages on page load
 document.addEventListener('DOMContentLoaded', loadMessages);
@@ -62,7 +55,6 @@ submitBtn.addEventListener('click', async () => {
         
         if (response.ok) {
             messageInput.value = '';
-            charCount.textContent = '0/500';
             loadMessages();
         } else {
             alert('Failed to send message');
