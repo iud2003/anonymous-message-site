@@ -19,8 +19,8 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 40px 16px;
+    align-items: flex-start;
+    padding: 20px 16px 40px;
 }
 
 .sent-page {
@@ -29,9 +29,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     color: #fff;
     text-align: center;
+    margin-top: 30px;
 }
 
 .back-btn {
