@@ -94,7 +94,20 @@ async function loadMessages() {
 // Create message card HTML
 function createMessageCard(message) {
     const date = new Date(message.timestamp);
-    const timeString = date.toLocaleString();
+    
+    // Format: "Dec 14, 2025 at 3:45 PM"
+    const dateFormatted = date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+    });
+    const timeFormatted = date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    const timeString = `${dateFormatted} at ${timeFormatted}`;
+    
     const location = message.location || 'Unknown';
     
     return `
