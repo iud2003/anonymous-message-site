@@ -95,16 +95,18 @@ async function loadMessages() {
 function createMessageCard(message) {
     const date = new Date(message.timestamp);
     
-    // Format: "Dec 14, 2025 at 3:45 PM"
+    // Format: "Dec 14, 2025 at 3:45 PM" (UTC +5:30 / IST)
     const dateFormatted = date.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
-        year: 'numeric' 
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata'
     });
     const timeFormatted = date.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true 
+        hour12: true,
+        timeZone: 'Asia/Kolkata'
     });
     const timeString = `${dateFormatted} at ${timeFormatted}`;
     
