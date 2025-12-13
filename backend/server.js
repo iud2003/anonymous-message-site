@@ -35,8 +35,13 @@ app.post('/message', async (req, res) => {
     const data = await fs.readFile(MESSAGES_FILE, 'utf8');
     const messages = JSON.parse(data);
     
-    // Get sender's IP address
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+    // Get sender's IP address (handle proxies: x-forwarded-for can be a list)
+    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+    if (typeof ip === 'string' && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    // Normalize IPv6 localhost
+    if (ip === '::1') ip = '127.0.0.1';
     
     // Get location from IP (using free ip-api.com service)
     let location = 'Unknown';
@@ -58,6 +63,7 @@ app.post('/message', async (req, res) => {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
+      ip,
       location: location
     };
     
