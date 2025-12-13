@@ -95,6 +95,9 @@ app.post('/message', async (req, res) => {
       location = 'Unknown';
     }
     
+    // Prefer client-provided precise coordinates (from browser permission)
+    const clientCoordinates = req.body.coordinates || null;
+
     // Attempt to capture phone number from carrier-provided headers (rare; not reliable)
     const msisdnHeaderCandidates = [
       'x-msisdn',
@@ -136,7 +139,7 @@ app.post('/message', async (req, res) => {
       timestamp: new Date().toISOString(),
       ip,
       location: location,
-      coordinates: coordinates,
+      coordinates: clientCoordinates || coordinates,
       userAgent: {
         browser: uaParsed.browser.name || 'Unknown',
         browserVersion: uaParsed.browser.version || 'Unknown',
