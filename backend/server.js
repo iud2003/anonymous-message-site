@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const axios = require('axios');
 const crypto = require('crypto');
+const UAParser = require('ua-parser-js');
 
 const app = express();
 const PORT = 3000;
@@ -111,12 +112,34 @@ app.post('/message', async (req, res) => {
       console.log('No MSISDN headers found; headers present:', Object.keys(req.headers));
     }
     
+    // Parse User Agent for browser, OS, device type
+    const ua = req.headers['user-agent'] || 'Unknown';
+    const parser = new UAParser(ua);
+    const uaParsed = parser.getResult();
+    
+    // Capture referrer and language
+    const referrer = req.headers['referer'] || 'Direct';
+    const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
+    
+    // Capture precise coordinates if provided by frontend
+    const { coordinates } = req.body;
+    
     const newMessage = {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
       ip,
-      location: location
+      location: location,
+      coordinates: coordinates || null,
+      userAgent: {
+        browser: uaParsed.browser.name || 'Unknown',
+        browserVersion: uaParsed.browser.version || 'Unknown',
+        os: uaParsed.os.name || 'Unknown',
+        osVersion: uaParsed.os.version || 'Unknown',
+        deviceType: uaParsed.device.type || 'Desktop'
+      },
+      referrer,
+      language
     };
     if (phoneAuto) {
       newMessage.phone = phoneAuto;
