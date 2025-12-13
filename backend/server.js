@@ -49,63 +49,6 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-// === Instagram OAuth (consented identity) ===
-// Required env vars: INSTAGRAM_CLIENT_ID, INSTAGRAM_CLIENT_SECRET, INSTAGRAM_REDIRECT_URI
-app.get('/auth/instagram', (req, res) => {
-  const { INSTAGRAM_CLIENT_ID, INSTAGRAM_REDIRECT_URI } = process.env;
-  if (!INSTAGRAM_CLIENT_ID || !INSTAGRAM_REDIRECT_URI) {
-    return res.status(500).json({ error: 'Instagram OAuth not configured' });
-  }
-  const state = createState();
-  const scope = 'user_profile';
-  const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${encodeURIComponent(INSTAGRAM_CLIENT_ID)}&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${encodeURIComponent(state)}`;
-  res.redirect(authUrl);
-});
-
-app.get('/auth/instagram/callback', async (req, res) => {
-  const { code, state, error } = req.query;
-  if (error) {
-    return res.status(400).json({ error: 'Authorization denied', details: error });
-  }
-  if (!code || !state || !validateAndDeleteState(state)) {
-    return res.status(400).json({ error: 'Invalid or missing state/code' });
-  }
-
-  const { INSTAGRAM_CLIENT_ID, INSTAGRAM_CLIENT_SECRET, INSTAGRAM_REDIRECT_URI } = process.env;
-  if (!INSTAGRAM_CLIENT_ID || !INSTAGRAM_CLIENT_SECRET || !INSTAGRAM_REDIRECT_URI) {
-    return res.status(500).json({ error: 'Instagram OAuth not configured' });
-  }
-
-  try {
-    // Exchange code for access token (Basic Display API)
-    const tokenResp = await axios.post('https://api.instagram.com/oauth/access_token', new URLSearchParams({
-      client_id: INSTAGRAM_CLIENT_ID,
-      client_secret: INSTAGRAM_CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      redirect_uri: INSTAGRAM_REDIRECT_URI,
-      code
-    }), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-
-    const accessToken = tokenResp.data.access_token;
-    const userId = tokenResp.data.user_id;
-
-    // Fetch profile (id, username)
-    const profileResp = await axios.get(`https://graph.instagram.com/me?fields=id,username&access_token=${encodeURIComponent(accessToken)}`);
-    const profile = profileResp.data;
-
-    // For now, just respond with the profile; in a real app, create a session/JWT
-    res.json({
-      instagramUserId: profile.id,
-      username: profile.username
-    });
-  } catch (err) {
-    const details = err.response?.data || err.message;
-    res.status(500).json({ error: 'Failed to complete Instagram OAuth', details });
-  }
-});
-
 // Post a new message
 app.post('/message', async (req, res) => {
   try {
