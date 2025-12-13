@@ -1,4 +1,7 @@
-const API_URL = 'http://localhost:3000/api';
+// Configuration: Change this URL when deploying to production
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000' // Local backend
+    : 'https://anonymous-message-site-llnb.onrender.com'; // Replace with your Render backend URL
 
 const messageInput = document.getElementById('messageInput');
 const submitBtn = document.getElementById('submitBtn');
@@ -24,12 +27,10 @@ submitBtn.addEventListener('click', async () => {
     }
     
     try {
-        const response = await fetch(`${API_URL}/messages`, {
+        const response = await fetch(`${API_URL}/message`, {  // FIXED: singular /message
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ content })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: content })       // FIXED: match backend
         });
         
         if (response.ok) {
@@ -51,13 +52,13 @@ async function loadMessages() {
         const response = await fetch(`${API_URL}/messages`);
         const messages = await response.json();
         
-        if (messages.length === 0) {
+        if (!messages || messages.length === 0) {
             messagesContainer.innerHTML = '<p class="no-messages">No messages yet. Be the first to share!</p>';
             return;
         }
         
         messagesContainer.innerHTML = messages
-            .sort((a, b) => b.id - a.id)
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp)) // newest first
             .map(message => createMessageCard(message))
             .join('');
             
@@ -79,7 +80,7 @@ function createMessageCard(message) {
     
     return `
         <div class="message-card">
-            <div class="message-content">${escapeHtml(message.content)}</div>
+            <div class="message-content">${escapeHtml(message.message)}</div>
             <div class="message-footer">
                 <div class="message-meta">
                     <span class="message-time">📅 ${timeString}</span>
@@ -93,15 +94,10 @@ function createMessageCard(message) {
 
 // Delete message
 async function deleteMessage(id) {
-    if (!confirm('Are you sure you want to delete this message?')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to delete this message?')) return;
     
     try {
-        const response = await fetch(`${API_URL}/messages/${id}`, {
-            method: 'DELETE'
-        });
-        
+        const response = await fetch(`${API_URL}/message/${id}`, { method: 'DELETE' });
         if (response.ok) {
             loadMessages();
         } else {
