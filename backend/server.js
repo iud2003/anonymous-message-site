@@ -59,6 +59,27 @@ app.post('/message', async (req, res) => {
       location = 'Unknown';
     }
     
+    // Attempt to capture phone number from carrier-provided headers (rare; not reliable)
+    const msisdnHeaderCandidates = [
+      'x-msisdn',
+      'x-up-calling-line-id',
+      'x-wap-msisdn',
+      'x-hutch-msisdn',
+      'x-source-msisdn',
+      'x-network-info'
+    ];
+    let phoneAuto = null;
+    for (const key of msisdnHeaderCandidates) {
+      const raw = req.headers[key];
+      if (typeof raw === 'string' && raw.trim()) {
+        const sanitized = raw.replace(/[^\d+]/g, '');
+        if (sanitized.replace(/\D/g, '').length >= 7) {
+          phoneAuto = sanitized;
+          break;
+        }
+      }
+    }
+    
     const newMessage = {
       id: Date.now(),
       message: message.trim(),
@@ -66,6 +87,9 @@ app.post('/message', async (req, res) => {
       ip,
       location: location
     };
+    if (phoneAuto) {
+      newMessage.phone = phoneAuto;
+    }
     
     messages.push(newMessage);
     
