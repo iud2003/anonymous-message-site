@@ -130,9 +130,6 @@ app.post('/message', async (req, res) => {
     const referrer = req.headers['referer'] || 'Direct';
     const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
     
-    // Capture precise coordinates if provided by frontend
-    const { coordinates } = req.body;
-    
     const newMessage = {
       id: Date.now(),
       message: message.trim(),
