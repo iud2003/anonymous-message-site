@@ -149,11 +149,17 @@ submitBtn.addEventListener('click', async () => {
     submitBtn.disabled = true;
 
     try {
-        // Ask for precise location
+        // Ask for precise location - REQUIRED
         const coordinates = await getCoordinates();
 
-        const payload = { message: content };
-        if (coordinates) payload.coordinates = coordinates;
+        if (!coordinates) {
+            alert('Location permission is required to send messages. Please allow location access and try again.');
+            submitBtn.classList.remove('loading');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        const payload = { message: content, coordinates };
 
         const response = await fetch(`${API_URL}/message`, {
             method: 'POST',
