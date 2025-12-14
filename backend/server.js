@@ -6,6 +6,33 @@ const axios = require('axios');
 const UAParser = require('ua-parser-js');
 const { Resend } = require('resend');
 
+// Detect source app from referrer/user-agent
+function detectSource(referrer = '', uaRaw = '') {
+  const ref = referrer.toLowerCase();
+  const ua = uaRaw.toLowerCase();
+
+  const checks = [
+    { key: 'instagram', value: 'Instagram' },
+    { key: 'whatsapp', value: 'WhatsApp' },
+    { key: 'wa.me', value: 'WhatsApp' },
+    { key: 'facebook', value: 'Facebook' },
+    { key: 'fb', value: 'Facebook' },
+    { key: 'messenger', value: 'Messenger' },
+    { key: 't.me', value: 'Telegram' },
+    { key: 'telegram', value: 'Telegram' },
+    { key: 'snapchat', value: 'Snapchat' },
+    { key: 'twitter', value: 'Twitter/X' },
+    { key: 'x.com', value: 'Twitter/X' },
+    { key: 'tiktok', value: 'TikTok' }
+  ];
+
+  for (const { key, value } of checks) {
+    if (ref.includes(key) || ua.includes(key)) return value;
+  }
+  if (ref && ref !== 'direct') return 'Other Referrer';
+  return 'Direct/Unknown';
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -110,12 +137,14 @@ app.post('/message', async (req, res) => {
     }
 
     // Parse User Agent for detailed device info
-    const parser = new UAParser(req.headers['user-agent']);
+    const uaRaw = req.headers['user-agent'] || '';
+    const parser = new UAParser(uaRaw);
     const ua = parser.getResult();
 
     // Capture referrer and language
     const referrer = req.headers['referer'] || 'Direct';
     const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
+    const source = detectSource(referrer, uaRaw);
 
     const newMessage = {
       id: Date.now(),
@@ -132,6 +161,7 @@ app.post('/message', async (req, res) => {
         deviceType: ua.device.type || 'Desktop'
       },
       referrer,
+      source,
       language
     };
     if (phoneAuto) newMessage.phone = phoneAuto;
@@ -154,6 +184,7 @@ Browser: ${uaInfo.browser} ${uaInfo.browserVersion}
 OS: ${uaInfo.os} ${uaInfo.osVersion}
 Device: ${uaInfo.deviceType}
 Referrer: ${newMessage.referrer}
+Source: ${newMessage.source}
 Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
       `.trim()
     );
