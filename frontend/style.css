@@ -296,4 +296,5 @@ a { color: inherit; text-decoration: none; }
     .page { max-width: 360px; }
     .card { padding: 16px 14px 10px; }
     .card-body { min-height: 120px; }
+    #messageInput { font-weight: 600; font-size: 1rem; }
 }
