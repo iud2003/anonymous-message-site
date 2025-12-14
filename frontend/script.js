@@ -153,9 +153,13 @@ submitBtn.addEventListener('click', async () => {
         const coordinates = await getCoordinates();
 
         if (!coordinates) {
-            alert('Location permission is required to send messages. Please allow location access and try again.');
+            const retry = confirm('📍 Location permission is required to send messages.\n\nPlease click "Allow" when your browser asks for location access.\n\nClick OK to try again.');
             submitBtn.classList.remove('loading');
             submitBtn.disabled = false;
+            if (retry) {
+                // User wants to retry - trigger the send again
+                submitBtn.click();
+            }
             return;
         }
 
