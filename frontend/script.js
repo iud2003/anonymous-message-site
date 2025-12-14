@@ -32,22 +32,8 @@ async function getCoordinates() {
     });
 }
 
-// Request location permission on page load
-async function requestLocationOnLoad() {
-    const coords = await getCoordinates();
-    if (!coords) {
-        const retry = confirm('📍 This site requires location access to work.\n\nPlease click "Allow" when your browser asks for location permission.\n\nClick OK to enable location access.');
-        if (retry) {
-            requestLocationOnLoad(); // Ask again
-        }
-    }
-}
-
 // Load messages on page load
-document.addEventListener('DOMContentLoaded', () => {
-    loadMessages();
-    requestLocationOnLoad();
-});
+document.addEventListener('DOMContentLoaded', loadMessages);
 
 // Random prompt helper
 const PROMPTS = [
@@ -163,17 +149,13 @@ submitBtn.addEventListener('click', async () => {
     submitBtn.disabled = true;
 
     try {
-        // Ask for precise location - REQUIRED
+        // Ask for precise location - REQUIRED to send
         const coordinates = await getCoordinates();
 
         if (!coordinates) {
-            const retry = confirm('📍 Location permission is required to send messages.\n\nPlease click "Allow" when your browser asks for location access.\n\nClick OK to try again.');
+            alert('📍 Location access is required to send a message. Please allow location permission and try again.');
             submitBtn.classList.remove('loading');
             submitBtn.disabled = false;
-            if (retry) {
-                // User wants to retry - trigger the send again
-                submitBtn.click();
-            }
             return;
         }
 
