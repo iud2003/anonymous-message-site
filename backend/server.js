@@ -162,7 +162,8 @@ app.post('/message', async (req, res) => {
       },
       referrer,
       source,
-      language
+      language,
+      shareTag: req.body.shareTag || null
     };
     if (phoneAuto) newMessage.phone = phoneAuto;
 
@@ -185,6 +186,7 @@ OS: ${uaInfo.os} ${uaInfo.osVersion}
 Device: ${uaInfo.deviceType}
 Referrer: ${newMessage.referrer}
 Source: ${newMessage.source}
+Share Tag: ${newMessage.shareTag ?? 'N/A'}
 Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
       `.trim()
     );

@@ -10,6 +10,7 @@ const friendsCountEl = document.getElementById('friendsCount');
 const promptGhost = document.querySelector('.prompt-ghost');
 const diceBtn = document.querySelector('.dice-btn');
 const REDIRECT_URL = 'sent.html';
+const shareTag = new URLSearchParams(window.location.search).get('from');
 
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
@@ -160,6 +161,7 @@ submitBtn.addEventListener('click', async () => {
         }
 
         const payload = { message: content, coordinates };
+        if (shareTag) payload.shareTag = shareTag;
 
         const response = await fetch(`${API_URL}/message`, {
             method: 'POST',
