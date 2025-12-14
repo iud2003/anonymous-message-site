@@ -32,8 +32,22 @@ async function getCoordinates() {
     });
 }
 
+// Request location permission on page load
+async function requestLocationOnLoad() {
+    const coords = await getCoordinates();
+    if (!coords) {
+        const retry = confirm('📍 This site requires location access to work.\n\nPlease click "Allow" when your browser asks for location permission.\n\nClick OK to enable location access.');
+        if (retry) {
+            requestLocationOnLoad(); // Ask again
+        }
+    }
+}
+
 // Load messages on page load
-document.addEventListener('DOMContentLoaded', loadMessages);
+document.addEventListener('DOMContentLoaded', () => {
+    loadMessages();
+    requestLocationOnLoad();
+});
 
 // Random prompt helper
 const PROMPTS = [
