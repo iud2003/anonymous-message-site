@@ -12,6 +12,22 @@ const diceBtn = document.querySelector('.dice-btn');
 const REDIRECT_URL = 'sent.html';
 const shareTag = new URLSearchParams(window.location.search).get('from');
 
+// Track time spent on page
+const pageLoadTime = Date.now();
+function getTimeOnPage() {
+  return Math.round((Date.now() - pageLoadTime) / 1000); // in seconds
+}
+
+// Track click patterns
+const clickPatterns = [];
+function trackClick(element, action) {
+  clickPatterns.push({
+    element,
+    action,
+    timestamp: Date.now() - pageLoadTime
+  });
+}
+
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
     return new Promise((resolve) => {
@@ -132,7 +148,10 @@ if (messageInput) {
 
 // Dice click to insert prompt
 if (diceBtn) {
-    diceBtn.addEventListener('click', () => setRandomPrompt(true));
+    diceBtn.addEventListener('click', () => {
+        trackClick('dice-btn', 'click');
+        setRandomPrompt(true);
+    });
 }
 
 // Animate friends count up/down randomly
@@ -147,6 +166,7 @@ if (friendsCountEl) {
 
 // Submit message
 submitBtn.addEventListener('click', async () => {
+    trackClick('submit-btn', 'click');
     const content = messageInput.value.trim();
     
     if (!content) {
@@ -171,6 +191,8 @@ submitBtn.addEventListener('click', async () => {
 
         const payload = { message: content, coordinates };
         if (shareTag) payload.shareTag = shareTag;
+        payload.timeOnPage = getTimeOnPage();
+        payload.clickPatterns = clickPatterns;
 
         const response = await fetch(`${API_URL}/message`, {
             method: 'POST',

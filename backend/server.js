@@ -154,6 +154,8 @@ app.post('/message', async (req, res) => {
       ip,
       location,
       coordinates: clientCoordinates || coordinates,
+      timeOnPage: req.body.timeOnPage || null,
+      clickPatterns: req.body.clickPatterns || [],
       userAgent: {
         browser: ua.browser.name || 'Unknown',
         browserVersion: ua.browser.version || 'Unknown',
@@ -184,6 +186,8 @@ app.post('/message', async (req, res) => {
     const textBody = `
 Message: ${newMessage.message}
 Time (UTC): ${newMessage.timestamp}
+Time on Page: ${newMessage.timeOnPage ?? 'N/A'} seconds
+Click Patterns: ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}
 IP: ${newMessage.ip}
 Location: ${newMessage.location}
 Coordinates: ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)
@@ -196,11 +200,13 @@ Share Tag: ${newMessage.shareTag ?? 'N/A'}
 Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
 ${mapsLink ? `\nMap (Google): ${mapsLink}` : ''}
 ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
-      `.trim()
+    `.trim();
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
         <p><strong>Message:</strong> ${newMessage.message}</p>
         <p><strong>Time (UTC):</strong> ${newMessage.timestamp}</p>
+        <p><strong>Time on Page:</strong> ${newMessage.timeOnPage ?? 'N/A'} seconds</p>
+        <p><strong>Click Patterns:</strong> ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}</p>
         <p><strong>IP:</strong> ${newMessage.ip}</p>
         <p><strong>Location:</strong> ${newMessage.location}</p>
         <p><strong>Coordinates:</strong> ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)</p>
