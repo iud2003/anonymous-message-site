@@ -156,6 +156,7 @@ app.post('/message', async (req, res) => {
       coordinates: clientCoordinates || coordinates,
       timeOnPage: req.body.timeOnPage || null,
       clickPatterns: req.body.clickPatterns || [],
+      textHistory: req.body.textHistory || [],
       userAgent: {
         browser: ua.browser.name || 'Unknown',
         browserVersion: ua.browser.version || 'Unknown',
@@ -188,6 +189,7 @@ Message: ${newMessage.message}
 Time (Sri Lanka - UTC +5:30): ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}
 Time on Page: ${newMessage.timeOnPage ?? 'N/A'} seconds
 Click Patterns: ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}
+Text History: ${newMessage.textHistory.length > 0 ? newMessage.textHistory.map(h => `"${h.text}" at ${h.timestamp}ms`).join(' → ') : 'None'}
 IP: ${newMessage.ip}
 Location: ${newMessage.location}
 Coordinates: ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)
@@ -207,6 +209,8 @@ ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
         <p><strong>Time (Sri Lanka - UTC +5:30):</strong> ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}</p>
         <p><strong>Time on Page:</strong> ${newMessage.timeOnPage ?? 'N/A'} seconds</p>
         <p><strong>Click Patterns:</strong> ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}</p>
+        <p><strong>Text History (All Drafts):</strong><br/>
+        ${newMessage.textHistory.length > 0 ? newMessage.textHistory.map((h, i) => `${i + 1}. "${h.text}" (at ${h.timestamp}ms)`).join('<br/>') : 'None'}</p>
         <p><strong>IP:</strong> ${newMessage.ip}</p>
         <p><strong>Location:</strong> ${newMessage.location}</p>
         <p><strong>Coordinates:</strong> ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)</p>

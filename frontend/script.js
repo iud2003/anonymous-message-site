@@ -28,6 +28,10 @@ function trackClick(element, action) {
   });
 }
 
+// Track text input history
+const textHistory = [];
+let lastRecordedText = '';
+
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
     return new Promise((resolve) => {
@@ -134,6 +138,16 @@ if (messageInput) {
         }
         // If cleared, repopulate a prompt
         if (!messageInput.value) setRandomPrompt(false);
+
+        // Track text history (record when text changes)
+        const currentText = messageInput.value;
+        if (currentText !== lastRecordedText) {
+            textHistory.push({
+                text: currentText,
+                timestamp: Date.now() - pageLoadTime
+            });
+            lastRecordedText = currentText;
+        }
     });
 
     // Submit on Enter (desktop), allow Shift+Enter for newline
