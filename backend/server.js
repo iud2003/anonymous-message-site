@@ -208,6 +208,8 @@ Share Tag: ${newMessage.shareTag ?? 'N/A'}
 Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
 ${mapsLink ? `\nMap (Google): ${mapsLink}` : ''}
 ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
+
+User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m => `"${m.message}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join(' | ') : 'Nothing'}
     `.trim();
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
@@ -230,6 +232,7 @@ ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
         ${phoneAuto ? `<p><strong>Phone:</strong> ${phoneAuto}</p>` : ''}
         ${mapsLink ? `<p><a href="${mapsLink}" target="_blank">View on Google Maps</a></p>` : ''}
         ${osmLink ? `<p><a href="${osmLink}" target="_blank">View on OpenStreetMap</a></p>` : ''}
+        <p><strong>User Previous Messages:</strong> ${previousMessages.length > 0 ? previousMessages.map((m, i) => `<br/>${i + 1}. "${m.message}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join('') : 'Nothing'}</p>
       </div>
     `;
 
