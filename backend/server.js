@@ -40,6 +40,9 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from frontend folder
+app.use(express.static(path.join(__dirname, '../frontend')));
+
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
