@@ -44,7 +44,7 @@ mongoose.connect(MONGODB_URI)
 
 // MongoDB Schema
 const messageSchema = new mongoose.Schema({
-  id: { type: Number, required: true, unique: true },
+  id: { type: Number, required: true },
   message: { type: String, required: true },
   timestamp: { type: String, required: true },
   timeOnPage: Number,
@@ -285,7 +285,8 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
       totalCount: previousMessages.length + 1
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save message' });
+    console.error('❌ Error saving message:', err);
+    res.status(500).json({ error: err.message || 'Failed to save message' });
   }
 });
 
