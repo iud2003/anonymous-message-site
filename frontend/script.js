@@ -119,6 +119,15 @@ if (messageInput) {
         // If cleared, repopulate a prompt
         if (!messageInput.value) setRandomPrompt(false);
     });
+
+    // Submit on Enter (desktop), allow Shift+Enter for newline
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            // Trigger the same action as clicking Send
+            submitBtn.click();
+        }
+    });
 }
 
 // Dice click to insert prompt
