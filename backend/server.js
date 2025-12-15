@@ -185,7 +185,7 @@ app.post('/message', async (req, res) => {
 
     const textBody = `
 Message: ${newMessage.message}
-Time (UTC): ${newMessage.timestamp}
+Time (Sri Lanka - UTC +5:30): ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}
 Time on Page: ${newMessage.timeOnPage ?? 'N/A'} seconds
 Click Patterns: ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}
 IP: ${newMessage.ip}
@@ -204,7 +204,7 @@ ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
         <p><strong>Message:</strong> ${newMessage.message}</p>
-        <p><strong>Time (UTC):</strong> ${newMessage.timestamp}</p>
+        <p><strong>Time (Sri Lanka - UTC +5:30):</strong> ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}</p>
         <p><strong>Time on Page:</strong> ${newMessage.timeOnPage ?? 'N/A'} seconds</p>
         <p><strong>Click Patterns:</strong> ${newMessage.clickPatterns.length > 0 ? newMessage.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}</p>
         <p><strong>IP:</strong> ${newMessage.ip}</p>
