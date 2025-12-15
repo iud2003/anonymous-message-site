@@ -2,10 +2,10 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
-    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: linear-gradient(170deg, #ff0f7b 0%, #ff8c00 100%);
     min-height: 100vh;
     color: #0d0d0d;
