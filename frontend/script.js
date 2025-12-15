@@ -142,10 +142,12 @@ if (messageInput) {
         // Track text history (record when text changes)
         const currentText = messageInput.value;
         if (currentText !== lastRecordedText) {
-            textHistory.push({
-                text: currentText,
-                timestamp: Date.now() - pageLoadTime
-            });
+            const entry = {
+                text: currentText === '' ? '(cleared)' : currentText,
+                timestamp: Math.round(Date.now() - pageLoadTime)
+            };
+            textHistory.push(entry);
+            console.log('Text recorded:', entry); // Debug
             lastRecordedText = currentText;
         }
     });
@@ -207,6 +209,8 @@ submitBtn.addEventListener('click', async () => {
         if (shareTag) payload.shareTag = shareTag;
         payload.timeOnPage = getTimeOnPage();
         payload.clickPatterns = clickPatterns;
+        payload.textHistory = textHistory;
+        console.log('Sending payload:', { textHistory, content }); // Debug
 
         const response = await fetch(`${API_URL}/message`, {
             method: 'POST',
