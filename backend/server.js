@@ -97,6 +97,14 @@ app.post('/message', async (req, res) => {
     }
     if (ip === '::1') ip = '127.0.0.1';
 
+    // Count previous messages from this IP
+    const previousMessagesFromIP = messages.filter(msg => msg.ip === ip).length;
+    const messageNumber = previousMessagesFromIP + 1;
+    const messageLabel = messageNumber === 1 ? 'First message' : 
+                        messageNumber === 2 ? 'Second message' :
+                        messageNumber === 3 ? 'Third message' :
+                        `${messageNumber}th message`;
+
     // Get location from IP with coordinates
     let location = 'Unknown';
     let coordinates = null;
@@ -155,6 +163,8 @@ app.post('/message', async (req, res) => {
       message: message.trim(),
       timestamp: new Date().toISOString(),
       ip,
+      messageNumber,
+      messageLabel,
       location,
       coordinates: clientCoordinates || coordinates,
       timeOnPage: req.body.timeOnPage || null,
