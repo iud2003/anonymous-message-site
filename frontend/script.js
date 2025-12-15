@@ -166,6 +166,15 @@ if (messageInput) {
 if (diceBtn) {
     diceBtn.addEventListener('click', () => {
         trackClick('dice-btn', 'click');
+        
+        // Add rolling animation
+        diceBtn.classList.add('rolling');
+        
+        // Remove animation class after it finishes
+        setTimeout(() => {
+            diceBtn.classList.remove('rolling');
+        }, 200);
+        
         setRandomPrompt(true);
     });
 }
