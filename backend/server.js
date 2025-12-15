@@ -123,9 +123,6 @@ app.post('/message', async (req, res) => {
       return res.status(400).json({ error: 'Message required' });
     }
 
-    const data = await fs.readFile(MESSAGES_FILE, 'utf8').catch(() => '[]');
-    const messages = JSON.parse(data);
-
     // Get sender's IP address (handle proxies)
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     if (typeof ip === 'string' && ip.includes(',')) {
