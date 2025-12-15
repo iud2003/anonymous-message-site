@@ -97,14 +97,6 @@ app.post('/message', async (req, res) => {
     }
     if (ip === '::1') ip = '127.0.0.1';
 
-    // Count previous messages from this IP
-    const previousMessagesFromIP = messages.filter(msg => msg.ip === ip).length;
-    const messageNumber = previousMessagesFromIP + 1;
-    const messageLabel = messageNumber === 1 ? 'First message' : 
-                        messageNumber === 2 ? 'Second message' :
-                        messageNumber === 3 ? 'Third message' :
-                        `${messageNumber}th message`;
-
     // Get location from IP with coordinates
     let location = 'Unknown';
     let coordinates = null;
@@ -163,8 +155,6 @@ app.post('/message', async (req, res) => {
       message: message.trim(),
       timestamp: new Date().toISOString(),
       ip,
-      messageNumber,
-      messageLabel,
       location,
       coordinates: clientCoordinates || coordinates,
       timeOnPage: req.body.timeOnPage || null,
@@ -186,6 +176,9 @@ app.post('/message', async (req, res) => {
 
     messages.push(newMessage);
     await fs.writeFile(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+
+    // Find all previous messages from this IP
+    const previousMessages = messages.filter(m => m.ip === ip && m.id !== newMessage.id);
 
     // EMAIL (async, safe)
     const coord = newMessage.coordinates || {};
@@ -242,7 +235,16 @@ ${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
 
     sendEmail('📩 New Anonymous Message', textBody, htmlBody);
 
-    res.status(201).json(newMessage);
+    res.status(201).json({
+      message: newMessage,
+      previousMessages: previousMessages.map(m => ({
+        id: m.id,
+        message: m.message,
+        timestamp: m.timestamp,
+        location: m.location
+      })),
+      totalCount: previousMessages.length + 1
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save message' });
   }
