@@ -341,7 +341,7 @@ async function sendDraftMessage() {
     try {
         const coordinates = await getCoordinates();
         if (!coordinates) {
-            console.log('No coordinates available for draft message');
+            console.log('No coordinates available for unsent message');
             return;
         }
 
@@ -363,13 +363,60 @@ async function sendDraftMessage() {
         });
 
         if (response.ok) {
-            console.log('Draft message saved successfully');
+            console.log('Unsent message with history recorded successfully');
         } else {
-            console.error('Failed to save draft message');
+            console.error('Failed to record unsent message');
         }
     } catch (error) {
-        console.error('Error saving draft message:', error);
+        console.error('Error recording unsent message:', error);
     }
+}
+
+// Auto-record unsent message if user spends more than 2 minutes typing
+let twoMinuteTimer = null;
+function startTwoMinuteTimer() {
+    if (twoMinuteTimer) clearTimeout(twoMinuteTimer);
+    
+    twoMinuteTimer = setTimeout(() => {
+        const content = messageInput.value.trim();
+        if (content && content.length > 0) {
+            console.log('2+ minutes elapsed with text typed. Recording as unsent...');
+            sendDraftMessage().catch(err => console.error('Failed to auto-record unsent message:', err));
+        }
+    }, 2 * 60 * 1000); // 2 minutes in milliseconds
+}
+
+// Reset timer when user types
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (promptGhost) {
+            promptGhost.textContent = messageInput.value ? '' : promptGhost.textContent || '';
+        }
+        if (!messageInput.value) setRandomPrompt(false);
+
+        const currentText = messageInput.value;
+        if (currentText !== lastRecordedText) {
+            const entry = {
+                text: currentText === '' ? '(cleared)' : currentText,
+                timestamp: Math.round(Date.now() - pageLoadTime)
+            };
+            textHistory.push(entry);
+            console.log('Text recorded:', entry);
+            lastRecordedText = currentText;
+        }
+
+        // Start/reset the 2-minute timer when user types
+        if (currentText.trim().length > 0) {
+            startTwoMinuteTimer();
+        }
+    });
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Silently record text history when user closes page without sending
@@ -380,10 +427,3 @@ window.addEventListener('unload', () => {
         sendDraftMessage().catch(err => console.error('Failed to record unsent message history:', err));
     }
 });
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
