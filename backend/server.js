@@ -31,7 +31,7 @@ function detectSource(referrer = '', uaRaw = '') {
     { key: 'tiktok', value: 'TikTok' }
   ];
 
-  for (const { k                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ey, value } of checks) {
+  for (const { key, value } of checks) {
     if (ref.includes(key) || ua.includes(key)) return value;
   }
   if (ref && ref !== 'direct') return 'Other Referrer';
