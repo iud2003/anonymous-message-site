@@ -85,6 +85,15 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
+// Log email configuration status
+if (resend) {
+  console.log('📧 Resend email enabled');
+  console.log('   From:', process.env.FROM_EMAIL || 'onboarding@resend.dev');
+  console.log('   To  :', process.env.TO_EMAIL || 'isumuthsara2003@gmail.com');
+} else {
+  console.log('⚠️ Resend email disabled (RESEND_API_KEY not set)');
+}
+
 async function sendEmail(subject, text, html, state = 'sent') {
   if (!resend) {
     console.log('❌ Email disabled: RESEND_API_KEY not set');
@@ -216,6 +225,15 @@ app.post('/message', async (req, res) => {
       shareTag: req.body.shareTag || null
     };
     if (phoneAuto) newMessageData.phone = phoneAuto;
+
+    // Debug log for unsent vs sent
+    console.log('📨 Received message:', {
+      state: newMessageData.state,
+      length: newMessageData.message.length,
+      textHistoryLen: Array.isArray(newMessageData.textHistory) ? newMessageData.textHistory.length : 0,
+      referrer,
+      source
+    });
 
     // Save to MongoDB
     const newMessage = await Message.create(newMessageData);
