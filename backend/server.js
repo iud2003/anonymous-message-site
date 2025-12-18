@@ -87,22 +87,28 @@ const resend = process.env.RESEND_API_KEY
 
 async function sendEmail(subject, text, html, state = 'sent') {
   if (!resend) {
-    console.log('Email disabled: RESEND_API_KEY not set');
+    console.log('❌ Email disabled: RESEND_API_KEY not set');
+    console.log('Set RESEND_API_KEY environment variable to enable emails');
     return;
   }
 
   try {
     const stateLabel = state === 'unsent' ? '(DRAFT)' : '';
+    const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+    const toEmail = process.env.TO_EMAIL || 'isumuthsara2003@gmail.com';
+    
+    console.log(`📧 Sending email - From: ${fromEmail}, To: ${toEmail}, State: ${state}`);
+    
     await resend.emails.send({
-      from: process.env.FROM_EMAIL || 'onboarding@resend.dev',
-      to: process.env.TO_EMAIL || 'isumuthsara2003@gmail.com',
+      from: fromEmail,
+      to: toEmail,
       subject: `${stateLabel} ${subject}`,
       text,
       html
     });
-    console.log(`Email notification sent (State: ${state})`);
+    console.log(`✅ Email notification sent (State: ${state})`);
   } catch (err) {
-    console.error('Email send failed:', err.message);
+    console.error('❌ Email send failed:', err.message);
   }
 }
 
