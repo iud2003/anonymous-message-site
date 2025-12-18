@@ -214,6 +214,9 @@ submitBtn.addEventListener('click', async () => {
             return;
         }
 
+        // Cache coordinates for unsent messages
+        lastCoordinates = coordinates;
+
         const payload = { message: content, coordinates };
         if (shareTag) payload.shareTag = shareTag;
         payload.timeOnPage = getTimeOnPage();
