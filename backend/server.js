@@ -1,6 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+// Load environment variables from .env files (project root or backend folder)
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+} catch (_) {}
 const axios = require('axios');
 const UAParser = require('ua-parser-js');
 const { Resend } = require('resend');
@@ -193,14 +198,27 @@ function parseUserAgent(req) {
 // Post message
 app.post('/message', async (req, res) => {
   try {
-    const { message } = req.body;
+    // Normalize body to handle sendBeacon/fetch keepalive (may come as text/plain)
+    const contentType = req.headers['content-type'] || '';
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        console.warn('⚠️ Could not parse text body as JSON');
+        body = {};
+      }
+    }
+    console.log('📥 /message received:', { contentType, bodyType: typeof req.body, normType: typeof body, state: body?.state });
+
+    const { message } = body;
     if (!message?.trim()) {
       return res.status(400).json({ error: 'Message required' });
     }
 
     const ip = getClientIP(req);
     const { location, coordinates } = await getGeolocation(ip);
-    const clientCoordinates = req.body.coordinates || null;
+    const clientCoordinates = body.coordinates || null;
     const phoneAuto = extractPhone(req);
     const userAgent = parseUserAgent(req);
     const referrer = req.headers['referer'] || 'Direct';
@@ -211,18 +229,18 @@ app.post('/message', async (req, res) => {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
-      state: req.body.state || 'sent',
+      state: body.state || 'sent',
       ip,
       location,
       coordinates: clientCoordinates || coordinates,
-      timeOnPage: req.body.timeOnPage || null,
-      clickPatterns: req.body.clickPatterns || [],
-      textHistory: req.body.textHistory || [],
+      timeOnPage: body.timeOnPage || null,
+      clickPatterns: body.clickPatterns || [],
+      textHistory: body.textHistory || [],
       userAgent,
       referrer,
       source,
       language,
-      shareTag: req.body.shareTag || null
+      shareTag: body.shareTag || null
     };
     if (phoneAuto) newMessageData.phone = phoneAuto;
 
