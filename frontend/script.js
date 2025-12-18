@@ -214,9 +214,6 @@ submitBtn.addEventListener('click', async () => {
             return;
         }
 
-        // Cache coordinates for unsent messages
-        lastCoordinates = coordinates;
-
         const payload = { message: content, coordinates };
         if (shareTag) payload.shareTag = shareTag;
         payload.timeOnPage = getTimeOnPage();
@@ -232,7 +229,6 @@ submitBtn.addEventListener('click', async () => {
         
         if (response.ok) {
             messageInput.value = '';
-            unsentDispatched = true; // avoid any pending unsent dispatch
             // Redirect if configured, otherwise refresh messages
             if (REDIRECT_URL) {
                 window.location.href = REDIRECT_URL;
@@ -300,12 +296,9 @@ function createMessageCard(message) {
     const timeString = `${dateFormatted} at ${timeFormatted}`;
     
     const location = message.location || 'Unknown';
-    const stateLabel = message.state === 'unsent' ? '📝 DRAFT' : '✅ SENT';
-    const stateClass = message.state === 'unsent' ? 'state-unsent' : 'state-sent';
     
     return `
         <div class="message-card">
-            <div class="message-state ${stateClass}">${stateLabel}</div>
             <div class="message-content">${escapeHtml(message.message)}</div>
             <div class="message-footer">
                 <div class="message-meta">
@@ -335,150 +328,9 @@ async function deleteMessage(id) {
     }
 }
 
-// Store last known coordinates and guard to avoid duplicate sends
-let lastCoordinates = null;
-let unsentDispatched = false;
-
-async function sendDraftMessage() {
-    const content = messageInput.value.trim();
-    if (!content || content.length === 0) {
-        console.log('📝 No draft content to save');
-        return; // No draft to save
-    }
-
-    if (unsentDispatched) {
-        console.log('🛑 Unsent already dispatched, skipping duplicate');
-        return;
-    }
-
-    try {
-        console.log('📤 Sending unsent message...');
-        console.log('Content length:', content.length);
-        console.log('Text history entries:', textHistory.length);
-        
-        // Try to get coordinates with a short timeout (2 seconds)
-        let coordinates = lastCoordinates || null;
-        
-        // Try fresh coordinates but don't wait too long
-        const coordinatesPromise = getCoordinates();
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2000));
-        const freshCoordinates = await Promise.race([coordinatesPromise, timeoutPromise]);
-        
-        if (freshCoordinates) {
-            coordinates = freshCoordinates;
-            lastCoordinates = freshCoordinates;
-        }
-
-        const payload = {
-            message: content,
-            coordinates: coordinates || { latitude: null, longitude: null, accuracy: null },
-            state: 'unsent',
-            timeOnPage: getTimeOnPage(),
-            clickPatterns: clickPatterns,
-            textHistory: textHistory
-        };
-
-        if (shareTag) payload.shareTag = shareTag;
-
-        console.log('📡 Sending unsent message with coordinates:', coordinates ? '✅' : '❌');
-        
-        // Use sendBeacon for unload/hidden events - it's more reliable
-        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        const sent = navigator.sendBeacon(`${API_URL}/message`, blob);
-        
-        if (sent) {
-            console.log('✅ Unsent message beacon sent successfully');
-            unsentDispatched = true;
-        } else {
-            console.log('⚠️ Beacon may have failed, trying fetch...');
-            // Fallback to fetch if sendBeacon fails
-            await fetch(`${API_URL}/message`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-                keepalive: true
-            });
-            console.log('✅ Unsent message sent via fetch');
-            unsentDispatched = true;
-        }
-
-    } catch (error) {
-        console.error('❌ Error recording unsent message:', error);
-    }
-}
-
-// Auto-record unsent message if user spends more than 2 minutes typing
-let twoMinuteTimer = null;
-function startTwoMinuteTimer() {
-    if (twoMinuteTimer) clearTimeout(twoMinuteTimer);
-    
-    twoMinuteTimer = setTimeout(() => {
-        const content = messageInput.value.trim();
-        if (content && content.length > 0) {
-            console.log('⏱️ 2+ minutes elapsed with text typed. Recording as unsent...');
-            console.log('Content:', content.substring(0, 50));
-            sendDraftMessage().catch(err => console.error('Failed to auto-record unsent message:', err));
-        }
-    }, 2 * 60 * 1000); // 2 minutes in milliseconds
-}
-
-// Reset timer when user types
-if (messageInput) {
-    messageInput.addEventListener('input', () => {
-        if (promptGhost) {
-            promptGhost.textContent = messageInput.value ? '' : promptGhost.textContent || '';
-        }
-        if (!messageInput.value) setRandomPrompt(false);
-
-        const currentText = messageInput.value;
-        if (currentText !== lastRecordedText) {
-            const entry = {
-                text: currentText === '' ? '(cleared)' : currentText,
-                timestamp: Math.round(Date.now() - pageLoadTime)
-            };
-            textHistory.push(entry);
-            console.log('Text recorded:', entry);
-            lastRecordedText = currentText;
-        }
-
-        // Start/reset the 2-minute timer when user types
-        if (currentText.trim().length > 0) {
-            startTwoMinuteTimer();
-        }
-    });
-}
-
 // Escape HTML to prevent XSS
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
-
-// Prefer visibilitychange/pagehide (more reliable across browsers)
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        const content = messageInput.value.trim();
-        if (content) {
-            console.log('👀 Page hidden detected! Recording unsent message...');
-            sendDraftMessage().catch(err => console.error('Failed to record unsent on hidden:', err));
-        }
-    }
-});
-
-window.addEventListener('pagehide', () => {
-    const content = messageInput.value.trim();
-    if (content) {
-        console.log('🚪 Page hide detected! Recording unsent message...');
-        sendDraftMessage().catch(err => console.error('Failed to record unsent on pagehide:', err));
-    }
-});
-
-// Fallback: unload (least reliable, but keep as last resort)
-window.addEventListener('unload', () => {
-    const content = messageInput.value.trim();
-    if (content) {
-        console.log('🔴 Page unload detected! Recording unsent message...');
-        sendDraftMessage();
-    }
-});

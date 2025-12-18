@@ -303,26 +303,6 @@ a { color: inherit; text-decoration: none; }
     border-radius: 14px;
     padding: 14px;
     box-shadow: 0 12px 28px rgba(0,0,0,0.12);
-    border-left: 4px solid #999;
-}
-.message-card .message-state {
-    font-size: 0.85rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 6px;
-    text-align: center;
-}
-.message-card .state-sent {
-    background-color: #d4edda;
-    color: #155724;
-    border-left-color: #28a745;
-}
-.message-card .state-unsent {
-    background-color: #fff3cd;
-    color: #856404;
-    border-left-color: #ffc107;
 }
 .message-content { color: #222; font-weight: 600; margin-bottom: 6px; }
 .message-time { color: #666; font-size: 0.9rem; }
