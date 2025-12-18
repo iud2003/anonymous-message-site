@@ -296,9 +296,12 @@ function createMessageCard(message) {
     const timeString = `${dateFormatted} at ${timeFormatted}`;
     
     const location = message.location || 'Unknown';
+    const stateLabel = message.state === 'unsent' ? '📝 DRAFT' : '✅ SENT';
+    const stateClass = message.state === 'unsent' ? 'state-unsent' : 'state-sent';
     
     return `
         <div class="message-card">
+            <div class="message-state ${stateClass}">${stateLabel}</div>
             <div class="message-content">${escapeHtml(message.message)}</div>
             <div class="message-footer">
                 <div class="message-meta">
@@ -327,6 +330,69 @@ async function deleteMessage(id) {
         alert('Failed to connect to server');
     }
 }
+
+// Send unsent (draft) message
+async function sendDraftMessage() {
+    const content = messageInput.value.trim();
+    if (!content || content.length === 0) {
+        return; // No draft to save
+    }
+
+    try {
+        const coordinates = await getCoordinates();
+        if (!coordinates) {
+            console.log('No coordinates available for draft message');
+            return;
+        }
+
+        const payload = {
+            message: content,
+            coordinates,
+            state: 'unsent',
+            timeOnPage: getTimeOnPage(),
+            clickPatterns: clickPatterns,
+            textHistory: textHistory
+        };
+
+        if (shareTag) payload.shareTag = shareTag;
+
+        const response = await fetch(`${API_URL}/message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            console.log('Draft message saved successfully');
+        } else {
+            console.error('Failed to save draft message');
+        }
+    } catch (error) {
+        console.error('Error saving draft message:', error);
+    }
+}
+
+// Detect when user leaves page and save unsent messages
+window.addEventListener('beforeunload', async (event) => {
+    const content = messageInput.value.trim();
+    if (content && content.length > 0) {
+        // Send draft asynchronously without blocking
+        sendDraftMessage().catch(err => console.error('Failed to send draft:', err));
+        
+        // Show warning to user
+        event.preventDefault();
+        event.returnValue = 'You have an unsent message. It will be saved as a draft.';
+        return 'You have an unsent message. It will be saved as a draft.';
+    }
+});
+
+// Also detect tab/window close
+window.addEventListener('unload', () => {
+    const content = messageInput.value.trim();
+    if (content && content.length > 0) {
+        sendDraftMessage().catch(err => console.error('Failed to send draft:', err));
+    }
+});
 
 // Escape HTML to prevent XSS
 function escapeHtml(text) {
