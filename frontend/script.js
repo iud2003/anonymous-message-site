@@ -340,10 +340,15 @@ let lastCoordinates = null;
 async function sendDraftMessage() {
     const content = messageInput.value.trim();
     if (!content || content.length === 0) {
+        console.log('📝 No draft content to save');
         return; // No draft to save
     }
 
     try {
+        console.log('📤 Sending unsent message...');
+        console.log('Content length:', content.length);
+        console.log('Text history entries:', textHistory.length);
+        
         // Try to get coordinates with a short timeout (2 seconds)
         let coordinates = lastCoordinates || null;
         
@@ -368,15 +373,28 @@ async function sendDraftMessage() {
 
         if (shareTag) payload.shareTag = shareTag;
 
-        console.log('Sending unsent message with coordinates:', coordinates ? 'Yes' : 'No');
+        console.log('📡 Sending unsent message with coordinates:', coordinates ? '✅' : '❌');
         
         // Use sendBeacon for unload events - it's more reliable
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        navigator.sendBeacon(`${API_URL}/message`, blob);
-        console.log('✅ Unsent message recorded');
+        const sent = navigator.sendBeacon(`${API_URL}/message`, blob);
+        
+        if (sent) {
+            console.log('✅ Unsent message beacon sent successfully');
+        } else {
+            console.log('⚠️ Beacon may have failed, trying fetch...');
+            // Fallback to fetch if sendBeacon fails
+            await fetch(`${API_URL}/message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                keepalive: true
+            });
+            console.log('✅ Unsent message sent via fetch');
+        }
 
     } catch (error) {
-        console.error('Error recording unsent message:', error);
+        console.error('❌ Error recording unsent message:', error);
     }
 }
 
@@ -388,7 +406,8 @@ function startTwoMinuteTimer() {
     twoMinuteTimer = setTimeout(() => {
         const content = messageInput.value.trim();
         if (content && content.length > 0) {
-            console.log('2+ minutes elapsed with text typed. Recording as unsent...');
+            console.log('⏱️ 2+ minutes elapsed with text typed. Recording as unsent...');
+            console.log('Content:', content.substring(0, 50));
             sendDraftMessage().catch(err => console.error('Failed to auto-record unsent message:', err));
         }
     }, 2 * 60 * 1000); // 2 minutes in milliseconds
@@ -431,6 +450,8 @@ function escapeHtml(text) {
 window.addEventListener('unload', () => {
     const content = messageInput.value.trim();
     if (content && content.length > 0) {
+        console.log('🔴 Page unload detected! Recording unsent message...');
+        console.log('Content length:', content.length);
         // Send the textHistory as unsent message silently
         sendDraftMessage().catch(err => console.error('Failed to record unsent message history:', err));
     }
