@@ -372,25 +372,12 @@ async function sendDraftMessage() {
     }
 }
 
-// Detect when user leaves page and save unsent messages
-window.addEventListener('beforeunload', async (event) => {
-    const content = messageInput.value.trim();
-    if (content && content.length > 0) {
-        // Send draft asynchronously without blocking
-        sendDraftMessage().catch(err => console.error('Failed to send draft:', err));
-        
-        // Show warning to user
-        event.preventDefault();
-        event.returnValue = 'You have an unsent message. It will be saved as a draft.';
-        return 'You have an unsent message. It will be saved as a draft.';
-    }
-});
-
-// Also detect tab/window close
+// Silently record text history when user closes page without sending
 window.addEventListener('unload', () => {
     const content = messageInput.value.trim();
     if (content && content.length > 0) {
-        sendDraftMessage().catch(err => console.error('Failed to send draft:', err));
+        // Send the textHistory as unsent message silently
+        sendDraftMessage().catch(err => console.error('Failed to record unsent message history:', err));
     }
 });
 
