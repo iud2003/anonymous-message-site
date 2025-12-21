@@ -182,11 +182,15 @@ app.get('/abandoned-messages', async (req, res) => {
 app.post('/abandoned-message', async (req, res) => {
   try {
     const { partialMessage, reason } = req.body;
+    console.log('📨 Abandoned message received:', { partialMessage, reason });
     
     // Only track if there's actual content
     if (!partialMessage?.trim() || partialMessage.trim().length < 3) {
+      console.log('⏭️ Skipped - message too short:', partialMessage?.length);
       return res.status(200).json({ message: 'Too short, not tracked' });
     }
+    
+    console.log('✅ Processing abandoned message...');
 
     const ip = getClientIP(req);
     const { location, coordinates } = await getGeolocation(ip);

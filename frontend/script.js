@@ -22,46 +22,54 @@ function getTimeOnPage() {
 let messageSent = false;
 
 // Track abandoned messages when user leaves
-window.addEventListener('beforeunload', async (e) => {
+window.addEventListener('beforeunload', (e) => {
   const currentText = messageInput?.value?.trim();
   
   // Only track if there's meaningful text and message wasn't sent
   if (currentText && currentText.length >= 3 && !messageSent) {
-    // Get location silently (no prompt)
-    let coordinates = null;
-    try {
-      coordinates = await new Promise((resolve) => {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              accuracy: pos.coords.accuracy
-            }),
-            () => resolve(null),
-            { timeout: 1000, enableHighAccuracy: false }
-          );
-        } else {
-          resolve(null);
-        }
-      });
-    } catch (err) {
-      coordinates = null;
-    }
-
     const payload = {
       partialMessage: currentText,
       timeOnPage: getTimeOnPage(),
       clickPatterns: clickPatterns,
       textHistory: textHistory,
-      coordinates: coordinates,
       reason: 'page_exit'
     };
     if (shareTag) payload.shareTag = shareTag;
 
-    // Use sendBeacon for reliable tracking on page unload
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-    navigator.sendBeacon(`${API_URL}/abandoned-message`, blob);
+    console.log('🚀 Sending abandoned message:', payload);
+    
+    // Use fetch with keepalive - more reliable than sendBeacon
+    fetch(`${API_URL}/abandoned-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true  // Ensures delivery even on page unload
+    }).catch(err => console.log('❌ Error sending abandoned message:', err));
+  }
+});
+
+// Also track on page visibility change (when user switches tabs)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !messageSent) {
+    const currentText = messageInput?.value?.trim();
+    if (currentText && currentText.length >= 3) {
+      const payload = {
+        partialMessage: currentText,
+        timeOnPage: getTimeOnPage(),
+        clickPatterns: clickPatterns,
+        textHistory: textHistory,
+        reason: 'tab_switched'
+      };
+      if (shareTag) payload.shareTag = shareTag;
+      
+      console.log('🚀 Sending abandoned message (tab switch):', payload);
+      fetch(`${API_URL}/abandoned-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(err => console.log('❌ Error sending abandoned message:', err));
+    }
   }
 });
 
