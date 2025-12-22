@@ -130,30 +130,25 @@ if (resend) {
   console.log('⚠️ Resend email disabled (RESEND_API_KEY not set)');
 }
 
-async function sendEmail(subject, text, html) {
+function sendEmail(subject, text, html) {
   if (!resend) {
     console.log('❌ Email disabled: RESEND_API_KEY not set');
     console.log('Set RESEND_API_KEY environment variable to enable emails');
     return;
   }
 
-  try {
-    const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-    const toEmail = process.env.TO_EMAIL || 'isumuthsara2003@gmail.com';
-    
-    console.log(`📧 Sending email - From: ${fromEmail}, To: ${toEmail}`);
-    
-    await resend.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: subject,
-      text,
-      html
-    });
+  // Fire-and-forget: don't await, send in background
+  resend.emails.send({
+    from: process.env.FROM_EMAIL || 'onboarding@resend.dev',
+    to: process.env.TO_EMAIL || 'isumuthsara2003@gmail.com',
+    subject: subject,
+    text,
+    html
+  }).then(() => {
     console.log(`✅ Email notification sent`);
-  } catch (err) {
+  }).catch((err) => {
     console.error('❌ Email send failed:', err.message);
-  }
+  });
 }
 
 // Get all messages
