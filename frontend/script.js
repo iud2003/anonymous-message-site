@@ -25,11 +25,15 @@ let messageSent = false;
 window.addEventListener('beforeunload', (e) => {
   const currentText = messageInput?.value?.trim();
   
-    // Clear inactivity timer on page exit
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-    }
-    
+  // Clear inactivity timer on page exit
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+  }
+  
+  // Only track if there's meaningful text and message wasn't sent
+  if (currentText && currentText.length >= 3 && !messageSent) {
+    const payload = {
+      partialMessage: currentText,
       timeOnPage: getTimeOnPage(),
       clickPatterns: clickPatterns,
       textHistory: textHistory,
