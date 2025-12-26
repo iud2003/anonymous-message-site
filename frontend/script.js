@@ -91,8 +91,6 @@ function trackClick(element, action) {
 // Track text input history
 const textHistory = [];
 let lastRecordedText = '';
-// Prefetched coordinates to avoid blocking on send
-let prefetchedCoordinates = null;
 
 // Inactivity timer for abandoned messages (2 minutes)
 let inactivityTimer = null;
@@ -158,19 +156,13 @@ async function getCoordinates() {
                 });
             },
             () => resolve(null),
-            { timeout: 3000, enableHighAccuracy: false, maximumAge: 60000 }
+            { timeout: 8000, enableHighAccuracy: true }
         );
     });
 }
 
 // Load messages on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    // Start location fetch in background to avoid blocking later
-    try {
-        prefetchedCoordinates = await getCoordinates();
-    } catch (_) {}
-    loadMessages();
-});
+document.addEventListener('DOMContentLoaded', loadMessages);
 
 // Random prompt helper
 const PROMPTS = [
@@ -322,11 +314,17 @@ submitBtn.addEventListener('click', async () => {
     submitBtn.disabled = true;
 
     try {
-        // Use prefetched coordinates if available; don't block sending
-        const coordinates = prefetchedCoordinates;
+        // Ask for precise location - REQUIRED to send
+        const coordinates = await getCoordinates();
 
-        const payload = { message: content };
-        if (coordinates) payload.coordinates = coordinates;
+        if (!coordinates) {
+            alert('📍 Location access is required to send a message. Please allow location permission and try again.');
+            submitBtn.classList.remove('loading');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        const payload = { message: content, coordinates };
         if (shareTag) payload.shareTag = shareTag;
         payload.timeOnPage = getTimeOnPage();
         payload.clickPatterns = clickPatterns;
