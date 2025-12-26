@@ -280,7 +280,7 @@ a { color: inherit; text-decoration: none; }
     flex-direction: column;
     gap: 16px;
     font-weight: 700;
-    margin-top: 130px;
+    margin-top: 200px;
 }
 
 .cta-blurb {
@@ -291,10 +291,22 @@ a { color: inherit; text-decoration: none; }
 .footer-links {
     display: flex;
     gap: 18px;
+    justify-content: center;
     color: #f4f4f4;
     opacity: 0.9;
     font-weight: 600;
     font-size: 0.95rem;
+    margin-top: 8px;
+}
+
+.footer-links a {
+    color: #f4f4f4;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.footer-links a:hover {
+    opacity: 0.8;
 }
 
 /* Hidden messages list (kept for functionality) */
