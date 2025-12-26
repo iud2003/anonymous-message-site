@@ -25,10 +25,11 @@ let messageSent = false;
 window.addEventListener('beforeunload', (e) => {
   const currentText = messageInput?.value?.trim();
   
-  // Only track if there's meaningful text and message wasn't sent
-  if (currentText && currentText.length >= 3 && !messageSent) {
-    const payload = {
-      partialMessage: currentText,
+    // Clear inactivity timer on page exit
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+    }
+    
       timeOnPage: getTimeOnPage(),
       clickPatterns: clickPatterns,
       textHistory: textHistory,
@@ -86,6 +87,54 @@ function trackClick(element, action) {
 // Track text input history
 const textHistory = [];
 let lastRecordedText = '';
+
+// Inactivity timer for abandoned messages (2 minutes)
+let inactivityTimer = null;
+const INACTIVITY_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+function sendAbandonedMessage(reason = 'inactivity') {
+    const currentText = messageInput?.value?.trim();
+    
+    // Only send if there's meaningful text and message wasn't sent
+    if (currentText && currentText.length >= 3 && !messageSent) {
+        const payload = {
+            partialMessage: currentText,
+            timeOnPage: getTimeOnPage(),
+            clickPatterns: clickPatterns,
+            textHistory: textHistory,
+            reason: reason
+        };
+        if (shareTag) payload.shareTag = shareTag;
+
+        console.log('🚨 Sending abandoned message due to:', reason, payload);
+        
+        fetch(`${API_URL}/abandoned-message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+        }).catch(err => console.log('❌ Error sending abandoned message:', err));
+        
+        // Clear the message to prevent duplicate sends
+        messageInput.value = '';
+        if (promptGhost) promptGhost.textContent = '';
+    }
+}
+
+function resetInactivityTimer() {
+    // Clear existing timer
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+    }
+    
+    // Only set timer if there's text and message hasn't been sent
+    const currentText = messageInput?.value?.trim();
+    if (currentText && currentText.length >= 3 && !messageSent) {
+        inactivityTimer = setTimeout(() => {
+            sendAbandonedMessage('inactivity_2min');
+        }, INACTIVITY_TIMEOUT);
+    }
+}
 
 // Get precise coordinates using Geolocation API (prompts user)
 async function getCoordinates() {
@@ -204,6 +253,9 @@ if (messageInput) {
             textHistory.push(entry);
             lastRecordedText = currentText;
         }
+        
+        // Reset inactivity timer on every keystroke
+        resetInactivityTimer();
     });
 
     // Submit on Enter (desktop), allow Shift+Enter for newline
@@ -282,6 +334,12 @@ submitBtn.addEventListener('click', async () => {
         
         if (response.ok) {
             messageSent = true; // Mark message as sent to prevent abandoned tracking
+            
+            // Clear inactivity timer since message was successfully sent
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+            }
+            
             messageInput.value = '';
             // Redirect if configured, otherwise refresh messages
             if (REDIRECT_URL) {
